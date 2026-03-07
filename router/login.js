@@ -9,14 +9,12 @@ const loginHandler = require('../router_handle/login')
 // 导入expreJoi
 const expressJoi = require('@escook/express-joi')
 // 导入验证规则
-const {
-	login_limit
-} = require('../limit/login.js')
+const { login_limit } = require('../limit/login.js')
 
 // 注册
-router.post('/register',expressJoi(login_limit),loginHandler.register)
+router.post('/register', expressJoi(login_limit), loginHandler.register)
 // 登录
-router.post('/login',expressJoi(login_limit),loginHandler.login)
+router.post('/login', expressJoi(login_limit), loginHandler.login)
 
 // 向外暴露路由
 module.exports = router
