@@ -50,8 +50,8 @@ app.use((req, res, next) => {
   next()
 })
 
-const jwtconfig = require('./jwt_config/index.js')
-const { expressjwt: jwt } = require('express-jwt')
+// const jwtconfig = require('./jwt_config/index.js')
+// const { expressjwt: jwt } = require('express-jwt')
 // app.use(jwt({
 // 	secret:jwtconfig.jwtSecretKey,algorithms:['HS256']
 // }).unless({
@@ -64,6 +64,22 @@ const Joi = require('joi')
 app.use('/api', loginRouter)
 const userRouter = require('./router/userinfo.js')
 app.use('/user', userRouter)
+const setRouter = require('./router/setting.js')
+app.use('/set', setRouter)
+// const productRouter = require('./router/product.js')
+// app.use('/pro', productRouter)
+// const messageRouter = require('./router/message.js')
+// app.use('/msg', messageRouter)
+// const fileRouter = require('./router/file.js')
+// app.use('/file', fileRouter)
+// const loginLogRouter = require('./router/login_log.js')
+// app.use('/llog', loginLogRouter)
+// const operationLogRouter = require('./router/operation_log.js')
+// app.use('/olog', operationLogRouter)
+// const overviewLogRouter = require('./router/overview.js')
+// app.use('/ov', overviewLogRouter)
+// const depMsgRouter = require('./router/department_msg.js')
+// app.use('/dm', depMsgRouter)
 
 // 对不符合joi规则的情况进行报错
 app.use((err, req, res, next) => {
