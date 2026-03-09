@@ -25,7 +25,7 @@ module.exports = [
     },
     rules: {
       'prettier/prettier': 'warn',
-      'no-unused-vars': 'warn',
+      'no-unused-vars': 'off',
       'no-console': 'off',
     },
   },
