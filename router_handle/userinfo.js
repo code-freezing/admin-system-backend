@@ -31,7 +31,6 @@ exports.uploadAvatar = (req, res) => {
     }
   )
 }
-
 // 绑定账号 onlyid account url
 exports.bindAccount = (req, res) => {
   const { account, onlyId, url } = req.body
@@ -261,8 +260,8 @@ exports.editAdmin = (req, res) => {
         email,
         department,
         update_time: date,
-        // read_list: null,
-        // read_status: 0,
+        read_list: null,
+        read_status: 0,
       }
       const sql = 'update users set ? where id = ?'
       db.query(sql, [updateContent, updateContent.id], (err, result) => {
