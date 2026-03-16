@@ -15,6 +15,8 @@ const { login_limit } = require('../limit/login.js')
 router.post('/register', expressJoi(login_limit), loginHandler.register)
 // 登录
 router.post('/login', expressJoi(login_limit), loginHandler.login)
+// returnMenuList
+router.post('/returnMenuList', loginHandler.returnMenuList)
 
 // 向外暴露路由
 module.exports = router

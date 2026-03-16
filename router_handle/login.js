@@ -105,3 +105,249 @@ exports.login = (req, res) => {
     })
   })
 }
+
+// 超级管理员路由
+const superAdminRouter = [
+  {
+    name: 'home',
+    path: '/home',
+    meta: { title: '首页' },
+    component: 'home/index',
+  },
+  {
+    name: 'set',
+    path: '/set',
+    meta: { title: '设置' },
+    component: 'set/index',
+  },
+  {
+    name: 'overview',
+    path: '/overview',
+    meta: { title: '系统概览' },
+    component: 'overview/index',
+  },
+  {
+    name: 'product_manage',
+    path: '/product_manage',
+    meta: { title: '产品管理员' },
+    component: 'user_manage/product_manage/index',
+  },
+  {
+    name: 'message_manage',
+    path: '/message_manage',
+    meta: { title: '消息管理员' },
+    component: 'user_manage/message_manage/index',
+  },
+  {
+    name: 'user_list',
+    path: '/user_list',
+    meta: { title: '用户列表' },
+    component: 'user_manage/user_list/index',
+  },
+  {
+    name: 'users_manage',
+    path: '/users_manage',
+    meta: { title: '用户管理' },
+    component: 'user_manage/users_manage/index',
+  },
+  {
+    name: 'product_manage_list',
+    path: '/product_manage_list',
+    meta: { title: '产品管理' },
+    component: 'product/product_manage_list/index',
+  },
+  {
+    name: 'out_product_manage_list',
+    path: '/out_product_manage_list',
+    meta: { title: '出库管理' },
+    component: 'product/out_product_manage_list/index',
+  },
+  {
+    name: 'message_list',
+    path: '/message_list',
+    meta: { title: '消息管理' },
+    component: 'message/message_list/index',
+  },
+  {
+    name: 'recycle',
+    path: '/recycle',
+    meta: { title: '回收站' },
+    component: 'message/recycle/index',
+  },
+  {
+    name: 'file',
+    path: '/file',
+    meta: { title: '文件管理' },
+    component: 'file/index',
+  },
+  {
+    name: 'operation_log',
+    path: '/operation_log',
+    meta: { title: '操作日志' },
+    component: 'operation_log/index',
+  },
+  {
+    name: 'login_log',
+    path: '/login_log',
+    meta: { title: '登录日志' },
+    component: 'login_log/index',
+  },
+]
+
+// 用户管理员路由
+const userAdminRouter = [
+  {
+    name: 'home',
+    path: '/home',
+    meta: { title: '首页' },
+    component: 'home/index',
+  },
+  {
+    name: 'set',
+    path: '/set',
+    meta: { title: '设置' },
+    component: 'set/index',
+  },
+  {
+    name: 'user_list',
+    path: '/user_list',
+    meta: { title: '用户列表' },
+    component: 'user_manage/user_list/index',
+  },
+  {
+    name: 'users_manage',
+    path: '/users_manage',
+    meta: { title: '用户管理' },
+    component: 'user_manage/users_manage/index',
+  },
+  {
+    name: 'file',
+    path: '/file',
+    meta: { title: '文件管理' },
+    component: 'file/index',
+  },
+]
+// 产品管理员路由
+const productAdminRouter = [
+  {
+    name: 'home',
+    path: '/home',
+    meta: { title: '首页' },
+    component: 'home/index',
+  },
+  {
+    name: 'set',
+    path: '/set',
+    meta: { title: '设置' },
+    component: 'set/index',
+  },
+  {
+    name: 'product_manage_list',
+    path: '/product_manage_list',
+    meta: { title: '产品管理' },
+    component: 'product/product_manage_list/index',
+  },
+  {
+    name: 'out_product_manage_list',
+    path: '/out_product_manage_list',
+    meta: { title: '出库管理' },
+    component: 'product/out_product_manage_list/index',
+  },
+  {
+    name: 'file',
+    path: '/file',
+    meta: { title: '文件管理' },
+    component: 'file/index',
+  },
+]
+// 消息管理员路由
+const messageAdminRouter = [
+  {
+    name: 'home',
+    path: '/home',
+    meta: { title: '首页' },
+    component: 'home/index',
+  },
+  {
+    name: 'set',
+    path: '/set',
+    meta: { title: '设置' },
+    component: 'set/index',
+  },
+  {
+    name: 'message_list',
+    path: '/message_list',
+    meta: { title: '消息管理' },
+    component: 'message/message_list/index',
+  },
+  {
+    name: 'recycle',
+    path: '/recycle',
+    meta: { title: '回收站' },
+    component: 'message/recycle/index',
+  },
+  {
+    name: 'file',
+    path: '/file',
+    meta: { title: '文件管理' },
+    component: 'file/index',
+  },
+]
+// 普通用户路由
+const userRouter = [
+  {
+    name: 'home',
+    path: '/home',
+    meta: { title: '首页' },
+    component: 'home/index',
+  },
+  {
+    name: 'set',
+    path: '/set',
+    meta: { title: '设置' },
+    component: 'set/index',
+  },
+  {
+    name: 'product_manage_list',
+    path: '/product_manage_list',
+    meta: { title: '产品管理' },
+    component: 'product/product_manage_list/index',
+  },
+  {
+    name: 'out_product_manage_list',
+    path: '/out_product_manage_list',
+    meta: { title: '出库管理' },
+    component: 'product/out_product_manage_list/index',
+  },
+  {
+    name: 'file',
+    path: '/file',
+    meta: { title: '文件管理' },
+    component: 'file/index',
+  },
+]
+
+// 返回用户的路由列表，参数ID
+exports.returnMenuList = (req, res) => {
+  const sql = 'select identity from users where id = ?'
+  db.query(sql, req.body.id, (err, result) => {
+    if (err) return res.cc(err)
+    let menu = []
+    if (result[0].identity == '超级管理员') {
+      menu = superAdminRouter
+    }
+    if (result[0].identity == '用户管理员') {
+      menu = userAdminRouter
+    }
+    if (result[0].identity == '产品管理员') {
+      menu = productAdminRouter
+    }
+    if (result[0].identity == '消息管理员') {
+      menu = messageAdminRouter
+    }
+    if (result[0].identity == '用户') {
+      menu = userRouter
+    }
+    res.send(menu)
+  })
+}
