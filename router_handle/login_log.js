@@ -1,22 +1,11 @@
-// 导入数据库操作模块
 const db = require('../db/index')
 
-/**
- * 登录日志字段
- *
- * account 账号
- * name 名字
- * email 邮箱/联系方式
- * login_time 登录时间
- *
- */
-
-// 登录记录
+// 写入一条登录日志。
 exports.loginLog = (req, res) => {
   const { account, name, email } = req.body
-  const login_time = new Date()
+  const loginTime = new Date()
   const sql = 'insert into login_log set ?'
-  db.query(sql, { account, name, email, login_time }, (err, result) => {
+  db.query(sql, { account, name, email, login_time: loginTime }, (err) => {
     if (err) return res.cc(err)
     res.send({
       status: 0,
@@ -24,7 +13,7 @@ exports.loginLog = (req, res) => {
   })
 }
 
-// 返回登录日志列表
+// 获取登录日志列表。
 exports.loginLogList = (req, res) => {
   const sql = 'select * from login_log'
   db.query(sql, (err, result) => {
@@ -33,7 +22,7 @@ exports.loginLogList = (req, res) => {
   })
 }
 
-// 搜索最近十条登录记录
+// 根据账号搜索最近 10 条登录记录。
 exports.searchLoginLogList = (req, res) => {
   const sql = 'select * from login_log where account = ? ORDER BY login_time limit 10'
   db.query(sql, req.body.account, (err, result) => {
@@ -42,7 +31,7 @@ exports.searchLoginLogList = (req, res) => {
   })
 }
 
-// 返回登录日志列表的长度
+// 获取登录日志总数。
 exports.loginLogListLength = (req, res) => {
   const sql = 'select * from login_log'
   db.query(sql, (err, result) => {
@@ -53,8 +42,7 @@ exports.loginLogListLength = (req, res) => {
   })
 }
 
-// 监听换页返回数据  登录日志列表
-// limit 10 为我们要拿到数据 offset 我们跳过多少条数据
+// 分页获取登录日志，每页 10 条。
 exports.returnLoginListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from login_log ORDER BY login_time limit 10 offset ${number} `
@@ -64,10 +52,10 @@ exports.returnLoginListData = (req, res) => {
   })
 }
 
-// 清空登录日志 truncate
+// 清空登录日志表。
 exports.clearLoginLogList = (req, res) => {
   const sql = 'truncate table login_log'
-  db.query(sql, (err, result) => {
+  db.query(sql, (err) => {
     if (err) return res.cc(err)
     res.send({
       status: 0,

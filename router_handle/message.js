@@ -1,22 +1,6 @@
-// 导入数据库操作模块
 const db = require('../db/index')
 
-/**
- * message_title 消息主题
- * message_category 消息类别
- * message_publish_department 消息发布部门
- * message_publish_name 消息发布者
- * message_receipt_object 消息接收者
- * message_click_number 消息查看数量
- * message_content 消息内容
- * message_publish_time 消息发布时间
- * message_update_time 消息更新时间
- * message_level 消息等级
- * message_status 默认为0 ，1在回收站
- * message_delete_time 消息删除时间
- */
-
-// 发布消息
+// 发布消息。
 exports.publishMessage = (req, res) => {
   const {
     message_title,
@@ -55,7 +39,7 @@ exports.publishMessage = (req, res) => {
   )
 }
 
-// 获取公司公告列表
+// 获取公司公告列表。
 exports.companyMessageList = (req, res) => {
   const sql =
     'select * from message where message_category = "公司公告" and message_status = "0" order by message_publish_time DESC limit 5'
@@ -65,7 +49,7 @@ exports.companyMessageList = (req, res) => {
   })
 }
 
-// 获取系统消息列表
+// 获取系统消息列表。
 exports.systemMessageList = (req, res) => {
   const sql =
     'select * from message where message_category = "系统消息" and message_status = "0"  order by message_publish_time DESC limit 5'
@@ -75,7 +59,7 @@ exports.systemMessageList = (req, res) => {
   })
 }
 
-// 编辑公告
+// 编辑消息并同步部门未读列表。
 exports.editMessage = (req, res) => {
   const {
     message_title,
@@ -85,7 +69,6 @@ exports.editMessage = (req, res) => {
     message_level,
     id,
   } = req.body
-  // 通过id返回消息之前的部门
   const returnOldDepartment = (id) => {
     return new Promise((resolve) => {
       const sql = 'select message_receipt_object from message where id = ?'
@@ -94,7 +77,6 @@ exports.editMessage = (req, res) => {
       })
     })
   }
-  // 对消息更改之后的接受部门的所有用户的Read_list进行一个添加id的操作，参数 newDepartment 消息 newid
   const pushIdInReadList = (newDepartment, newid) => {
     const sql = 'select read_list,read_status,id from users where department = ?'
     db.query(sql, newDepartment, (err, result) => {
@@ -111,7 +93,6 @@ exports.editMessage = (req, res) => {
     })
   }
 
-  // 把之前的接受部门的所有用户的ReadList里面的id删掉，参数 oldDepartment deleteid
   const deleteIdInReadList = (oldDepartment, deleteid) => {
     const sql = 'select read_list,read_status,id from users where department = ?'
     db.query(sql, oldDepartment, (err, result) => {
@@ -130,19 +111,15 @@ exports.editMessage = (req, res) => {
     })
   }
 
-  // 执行更新操作
   async function change() {
     const receiptObj = await returnOldDepartment(id)
-    // 如果返回的部门与修改后的部门不同，并且不等于全体成员
     if (receiptObj !== '全体成员' && receiptObj !== message_receipt_object) {
       pushIdInReadList(message_receipt_object, id)
       deleteIdInReadList(receiptObj, id)
     }
-    // 如果要把消息从原来的部门修改为全体成员
     if (message_receipt_object == '全体成员' && receiptObj !== message_receipt_object) {
       deleteIdInReadList(receiptObj, id)
     }
-    // 如果原来的消息面对的是全体成员，就需要对新的接收部门的用户的read_list加上id
     if (receiptObj == '全体成员' && receiptObj !== message_receipt_object) {
       pushIdInReadList(message_receipt_object, id)
     }
@@ -172,7 +149,7 @@ exports.editMessage = (req, res) => {
   change()
 }
 
-// 根据发布部门进行获取消息
+// 按发布部门筛选消息。
 exports.searchMessageBydepartment = (req, res) => {
   const sql = 'select * from message where message_publish_department = ? and message_status = "0"'
   db.query(sql, req.body.message_publish_department, (err, result) => {
@@ -181,7 +158,7 @@ exports.searchMessageBydepartment = (req, res) => {
   })
 }
 
-// 根据发布等级进行获取消息
+// 按消息等级筛选消息。
 exports.searchMessageByLevel = (req, res) => {
   const sql = 'select * from message where message_level = ? and message_status = "0"'
   db.query(sql, req.body.message_level, (err, result) => {
@@ -190,7 +167,7 @@ exports.searchMessageByLevel = (req, res) => {
   })
 }
 
-// 获取公告/系统消息
+// 获取消息详情。
 exports.getMessage = (req, res) => {
   const sql = 'select * from message where id = ?'
   db.query(sql, req.body.id, (err, result) => {
@@ -199,7 +176,7 @@ exports.getMessage = (req, res) => {
   })
 }
 
-// 更新点击率
+// 增加点击次数。
 exports.updateClick = (req, res) => {
   const { message_click_number, id } = req.body
   const number = message_click_number * 1 + 1
@@ -213,7 +190,7 @@ exports.updateClick = (req, res) => {
   })
 }
 
-// 初次删除
+// 软删除消息到回收站。
 exports.firstDelete = (req, res) => {
   const message_status = 1
   const message_delete_time = new Date()
@@ -227,7 +204,7 @@ exports.firstDelete = (req, res) => {
   })
 }
 
-// 获取回收站的列表
+// 获取回收站列表。
 exports.recycleList = (req, res) => {
   const sql = 'select * from message where message_status = 1'
   db.query(sql, (err, result) => {
@@ -236,7 +213,7 @@ exports.recycleList = (req, res) => {
   })
 }
 
-// 获取回收站总数
+// 获取回收站总数。
 exports.getRecycleMessageLength = (req, res) => {
   const sql = 'select * from message where message_status = 1'
   db.query(sql, (err, result) => {
@@ -247,7 +224,7 @@ exports.getRecycleMessageLength = (req, res) => {
   })
 }
 
-// 回收站监听换页
+// 分页获取回收站数据。
 exports.returnRecycleListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from message where message_status = 1 ORDER BY message_delete_time limit 10 offset ${number} `
@@ -257,7 +234,7 @@ exports.returnRecycleListData = (req, res) => {
   })
 }
 
-// 还原操作
+// 从回收站还原消息。
 exports.recover = (req, res) => {
   const message_status = 0
   const message_update_time = new Date()
@@ -271,7 +248,7 @@ exports.recover = (req, res) => {
   })
 }
 
-// 删除操作
+// 永久删除消息。
 exports.deleteMessage = (req, res) => {
   const sql = 'delete from message where id = ?'
   db.query(sql, req.body.id, (err, result) => {
@@ -283,7 +260,7 @@ exports.deleteMessage = (req, res) => {
   })
 }
 
-// 获取公司公告总数
+// 获取公司公告总数。
 exports.getCompanyMessageLength = (req, res) => {
   const sql = 'select * from message where message_category ="公司公告"'
   db.query(sql, (err, result) => {
@@ -294,7 +271,7 @@ exports.getCompanyMessageLength = (req, res) => {
   })
 }
 
-// 获取系统消息总数
+// 获取系统消息总数。
 exports.getSystemMessageLength = (req, res) => {
   const sql = 'select * from message where message_category ="系统消息"'
   db.query(sql, (err, result) => {
@@ -305,8 +282,7 @@ exports.getSystemMessageLength = (req, res) => {
   })
 }
 
-// 监听换页返回数据  公司公告列表
-// limit 10 为我们要拿到数据 offset 我们跳过多少条数据
+// 分页获取公司公告列表。
 exports.returnCompanyListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from message where message_category ="公司公告" and message_status = 0 ORDER BY message_publish_time limit 10 offset ${number} `
@@ -316,7 +292,7 @@ exports.returnCompanyListData = (req, res) => {
   })
 }
 
-// 监听换页返回数据  系统消息列表
+// 分页获取系统消息列表。
 exports.returnSystemListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from message where message_category ="系统消息"  and message_status = 0  ORDER BY message_publish_time limit 10 offset ${number} `

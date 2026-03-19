@@ -1,7 +1,7 @@
 const db = require('../db/index.js')
 const fs = require('fs')
 
-// 上传轮播图 需要两个参数  set_value set_name
+// 上传并更新轮播图配置。
 exports.uploadSwiper = (req, res) => {
   let oldName = req.files[0].filename
   let newName = Buffer.from(req.files[0].originalname, 'latin1').toString('utf8')
@@ -16,16 +16,13 @@ exports.uploadSwiper = (req, res) => {
   })
 }
 
-// 获取所有轮播图
+// 获取全部轮播图地址。
 exports.getAllSwiper = (req, res) => {
-  // like 匹配 字段是否符合 前缀为 ...
   const sql = "select set_value from setting where set_name like 'swiper%' "
   db.query(sql, (err, result) => {
     if (err) return res.cc(err)
     if (result) {
-      // 创建了一个数组
-      let array = []
-      // 把set_value 放进数组
+      const array = []
       result.forEach((e) => {
         array.push(e.set_value)
       })
@@ -39,7 +36,7 @@ exports.getAllSwiper = (req, res) => {
   })
 }
 
-// 获取公司名称
+// 获取公司名称。
 exports.getCompanyName = (req, res) => {
   const sql = 'select * from setting where set_name = "公司名称"'
   db.query(sql, (err, result) => {
@@ -55,7 +52,7 @@ exports.getCompanyName = (req, res) => {
   })
 }
 
-// 修改公司名字 参数 set_value
+// 修改公司名称。
 exports.changeCompanyName = (req, res) => {
   const sql = 'update setting set set_value = ? where set_name = "公司名称"'
   db.query(sql, req.body.set_value, (err, result) => {
@@ -67,7 +64,7 @@ exports.changeCompanyName = (req, res) => {
   })
 }
 
-// 编辑公司介绍的接口 参数 set_text set_name
+// 修改公司介绍文案。
 exports.changeCompanyIntroduce = (req, res) => {
   const sql = 'update setting set set_text = ? where set_name = ? '
   db.query(sql, [req.body.set_text, req.body.set_name], (err, result) => {
@@ -79,7 +76,7 @@ exports.changeCompanyIntroduce = (req, res) => {
   })
 }
 
-// 获取公司介绍 参数 set_name
+// 获取指定公司介绍内容。
 exports.getCompanyIntroduce = (req, res) => {
   const sql = 'select * from setting where set_name = ?'
   db.query(sql, req.body.set_name, (err, result) => {
@@ -88,7 +85,7 @@ exports.getCompanyIntroduce = (req, res) => {
   })
 }
 
-// 获取所有公司信息
+// 获取全部公司信息配置。
 exports.getAllCompanyIntroduce = (req, res) => {
   const sql = 'select * from setting where set_name like "公司%" '
   db.query(sql, (err, result) => {
@@ -98,8 +95,7 @@ exports.getAllCompanyIntroduce = (req, res) => {
   })
 }
 
-// -----其他设置
-// 部门设置 数组
+// 更新部门配置。
 exports.setDepartment = (req, res) => {
   const sql = 'update setting set set_value = ? where set_name = "部门设置" '
   db.query(sql, req.body.set_value, (err, result) => {
@@ -111,7 +107,7 @@ exports.setDepartment = (req, res) => {
   })
 }
 
-// 获取部门
+// 获取部门配置。
 exports.getDepartment = (req, res) => {
   const sql = 'select set_value from setting where set_name = "部门设置"'
   db.query(sql, (err, result) => {
@@ -127,7 +123,7 @@ exports.getDepartment = (req, res) => {
   })
 }
 
-// 产品设置 数组
+// 更新产品分类配置。
 exports.setProduct = (req, res) => {
   const sql = 'update setting set set_value = ? where set_name = "产品设置" '
   db.query(sql, req.body.set_value, (err, result) => {
@@ -139,7 +135,7 @@ exports.setProduct = (req, res) => {
   })
 }
 
-// 获取产品
+// 获取产品分类配置。
 exports.getProduct = (req, res) => {
   const sql = 'select set_value from setting where set_name = "产品设置"'
   db.query(sql, (err, result) => {

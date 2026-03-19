@@ -1,37 +1,6 @@
-// 导入数据库操作模块
 const db = require('../db/index')
 
-/**
- * id int
-
- * product_id 入库编号 int
- * product_name 产品名称 varchar
- * product_category 产品类别  varchar
- * product_unit 产品单位 varchar
- * product_in_warehouse_number 产品入库数量 库存 int
- * product_single_price 产品入库单价 int
- * product_all_price 产品入库总价 int
- * product_status 库存状态 100-300为正常 100以下为库存告急 300以上为过剩 varchar
- * product_create_person 入库操作人 varchar
- * product_create_time 产品新建时间 varchar
- * product_update_time 产品最新编辑时间 varchar
- * in_memo 入库备注
- * 
- * product_out_id 出库id int
- * product_out_number 出库数量 int
- * product_out_price 出库总价 int
- * product_out_apply_person 出库申请人 varchar
- * product_apply_time 申请出库时间 varchar
- * apply_memo 申请备注 varchar
- * product_out_status 出库状态 申请出库 or 同意 or 否决 varchar
- * product_audit_time 审核时间 varchar
- * product_out_audit_person 审核人 varchar
- * audit_memo 出库/审核备注 varchar
- * 
- */
-// memory就是备忘录的意思
-
-// 产品入库 创建产品
+// 产品入库。
 exports.createProduct = (req, res) => {
   const {
     product_id,
@@ -79,7 +48,7 @@ exports.createProduct = (req, res) => {
   })
 }
 
-// 删除产品
+// 删除产品。
 exports.deleteProduct = (req, res) => {
   const sql = 'delete from product where id = ?'
   db.query(sql, req.body.id, (err, result) => {
@@ -91,7 +60,7 @@ exports.deleteProduct = (req, res) => {
   })
 }
 
-// 编辑产品信息
+// 编辑产品信息。
 exports.editProduct = (req, res) => {
   const {
     product_name,
@@ -129,7 +98,7 @@ exports.editProduct = (req, res) => {
   )
 }
 
-// 获取产品列表
+// 获取产品列表。
 exports.getProductList = (req, res) => {
   const sql = 'select * from product where product_in_warehouse_number>= 0'
   db.query(sql, (err, result) => {
@@ -138,7 +107,7 @@ exports.getProductList = (req, res) => {
   })
 }
 
-// 产品申请出库
+// 提交产品出库申请。
 exports.applyOutProduct = (req, res) => {
   const product_out_status = '申请出库'
   const {
@@ -185,7 +154,7 @@ exports.applyOutProduct = (req, res) => {
   })
 }
 
-// 产品审核列表
+// 获取待审核产品列表。
 exports.applyProductList = (req, res) => {
   const sql = 'select * from product where product_out_status not in ("同意")'
   db.query(sql, (err, result) => {
@@ -194,7 +163,7 @@ exports.applyProductList = (req, res) => {
   })
 }
 
-// 对产品进行撤回申请
+// 撤回出库申请。
 exports.withdrawApplyProduct = (req, res) => {
   const sql =
     'update product set product_out_id = NULL,product_out_status = NULL , product_out_number =NULL,product_out_apply_person=NULL,apply_memo =NULL,product_out_price =NULL,product_apply_time = NULL where id = ?'
@@ -207,7 +176,7 @@ exports.withdrawApplyProduct = (req, res) => {
   })
 }
 
-// 产品审核
+// 审核出库申请。
 exports.auditProduct = (req, res) => {
   const {
     id,
@@ -224,11 +193,7 @@ exports.auditProduct = (req, res) => {
   } = req.body
   const product_audit_time = new Date()
   if (product_out_status == '同意') {
-    // // 产品出库总价
-    // product_out_price = product_out_number * 1 * product_single_price * 1
-    // 新的库存数量
     const newWarehouseNumber = product_in_warehouse_number * 1 - product_out_number * 1
-    // 新的库存总价
     const product_all_price = newWarehouseNumber * product_single_price
     const sql = 'insert into outproduct set ?'
     db.query(
@@ -274,7 +239,7 @@ exports.auditProduct = (req, res) => {
   }
 }
 
-// 通过入库编号对产品进行搜索
+// 通过入库编号搜索产品。
 exports.searchProductForId = (req, res) => {
   const sql = 'select * from product where product_id  = ?'
   db.query(sql, req.body.product_id, (err, result) => {
@@ -283,7 +248,7 @@ exports.searchProductForId = (req, res) => {
   })
 }
 
-// 通过出库申请编号对产品进行搜索
+// 通过出库申请编号搜索产品。
 exports.searchProductForApplyId = (req, res) => {
   const sql = 'select * from product where product_out_id   = ?'
   db.query(sql, req.body.product_out_id, (err, result) => {
@@ -292,7 +257,7 @@ exports.searchProductForApplyId = (req, res) => {
   })
 }
 
-// 通过出库编号对产品进行搜索
+// 通过出库编号搜索出库记录。
 exports.searchProductForOutId = (req, res) => {
   const sql = 'select * from outproduct where product_out_id   = ?'
   db.query(sql, req.body.product_out_id, (err, result) => {
@@ -301,7 +266,7 @@ exports.searchProductForOutId = (req, res) => {
   })
 }
 
-// 获取产品总数
+// 获取产品总数。
 exports.getProductLength = (req, res) => {
   const sql = 'select * from product where product_in_warehouse_number>= 0'
   db.query(sql, (err, result) => {
@@ -312,7 +277,7 @@ exports.getProductLength = (req, res) => {
   })
 }
 
-// 获取申请出库产品总数
+// 获取申请出库产品总数。
 exports.getApplyProductLength = (req, res) => {
   const sql =
     'select * from product where product_out_status = "申请出库" || product_out_status = "否决"'
@@ -324,7 +289,7 @@ exports.getApplyProductLength = (req, res) => {
   })
 }
 
-// 出库产品列表
+// 获取出库产品列表。
 exports.auditProductList = (req, res) => {
   const sql = 'select * from outproduct'
   db.query(sql, (err, result) => {
@@ -333,7 +298,7 @@ exports.auditProductList = (req, res) => {
   })
 }
 
-// 获取出库产品总数
+// 获取出库产品总数。
 exports.getOutProductLength = (req, res) => {
   const sql = 'select * from outproduct'
   db.query(sql, (err, result) => {
@@ -344,8 +309,7 @@ exports.getOutProductLength = (req, res) => {
   })
 }
 
-// 监听换页返回数据  产品页面
-// limit 10 为我们要拿到数据 offset 我们跳过多少条数据
+// 分页获取产品列表。
 exports.returnProductListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from product where product_in_warehouse_number>= 0 ORDER BY product_create_time limit 10 offset ${number} `
@@ -355,8 +319,7 @@ exports.returnProductListData = (req, res) => {
   })
 }
 
-// 监听换页返回数据  申请出库页面
-// limit 10 为我们要拿到数据 offset 我们跳过多少条数据
+// 分页获取出库申请列表。
 exports.returnApplyProductListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from product where product_out_status = "申请出库" || product_out_status = "否决" ORDER BY product_apply_time limit 10 offset ${number} `
@@ -366,8 +329,7 @@ exports.returnApplyProductListData = (req, res) => {
   })
 }
 
-// 监听换页返回数据  出库页面
-// limit 10 为我们要拿到数据 offset 我们跳过多少条数据
+// 分页获取出库记录列表。
 exports.returnOutProductListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from outproduct ORDER BY product_audit_time limit 10 offset ${number} `

@@ -1,15 +1,10 @@
 const db = require('../db/index.js')
-// 导入bcrypt加密中间件
 const bcrypt = require('bcrypt')
-// 导入node.js的crypto库生成uuid
 const crypto = require('crypto')
-// 导入fs处理文件
 const fs = require('fs')
 
-// 注意：这里没有做路径的防重复处理
-// 上传头像
+// 上传头像并生成临时绑定标识。
 exports.uploadAvatar = (req, res) => {
-  // 生成唯一标识
   const onlyId = crypto.randomUUID()
   let oldName = req.files[0].filename
   let newName = Buffer.from(req.files[0].originalname, 'latin1').toString('utf8')
@@ -31,7 +26,8 @@ exports.uploadAvatar = (req, res) => {
     }
   )
 }
-// 绑定账号 onlyid account url
+
+// 将头像记录与账号绑定。
 exports.bindAccount = (req, res) => {
   const { account, onlyId, url } = req.body
   const sql = 'update image set account = ? where onlyId = ?'
@@ -50,12 +46,11 @@ exports.bindAccount = (req, res) => {
   })
 }
 
-// 修改用户密码 先输入旧密码 oldPassword 新密码 newPassword id
+// 用户登录后修改密码。
 exports.changePassword = (req, res) => {
   const sql = 'select password from users where id = ?'
   db.query(sql, req.body.id, (err, result) => {
     if (err) return res.cc(err)
-    // bcrypt
     const compareResult = bcrypt.compareSync(req.body.oldPassword, result[0].password)
     if (!compareResult) {
       return res.send({
@@ -75,7 +70,7 @@ exports.changePassword = (req, res) => {
   })
 }
 
-// 获取用户信息 接收参数 id
+// 获取用户信息。
 exports.getUserInfo = (req, res) => {
   const sql = 'select * from users where id = ?'
   db.query(sql, req.body.id, (err, result) => {
@@ -85,7 +80,7 @@ exports.getUserInfo = (req, res) => {
   })
 }
 
-// 修改姓名 接收参数 id name
+// 修改用户名。
 exports.changeName = (req, res) => {
   const { id, name } = req.body
   const sql = 'update users set name = ? where id = ?'
@@ -98,7 +93,7 @@ exports.changeName = (req, res) => {
   })
 }
 
-// 修改性别 接收参数 id sex
+// 修改性别。
 exports.changeSex = (req, res) => {
   const { id, sex } = req.body
   const sql = 'update users set sex = ? where id = ?'
@@ -111,7 +106,7 @@ exports.changeSex = (req, res) => {
   })
 }
 
-// 修改邮箱 接收参数 id email
+// 修改邮箱。
 exports.changeEmail = (req, res) => {
   const { id, email } = req.body
   const sql = 'update users set email = ? where id = ?'
@@ -124,13 +119,12 @@ exports.changeEmail = (req, res) => {
   })
 }
 
-// 验证账户和与邮箱是否一致 email account
+// 校验账号与邮箱是否匹配。
 exports.verifyAccountAndEmail = (req, res) => {
   const { account, email } = req.body
   const sql = 'select * from users where account = ?'
   db.query(sql, account, (err, result) => {
     if (err) return res.cc(err)
-    // res.send(result[0].email)
     if (email == result[0].email) {
       res.send({
         status: 0,
@@ -146,7 +140,7 @@ exports.verifyAccountAndEmail = (req, res) => {
   })
 }
 
-// 登录页面修改密码 参数 newPassword id
+// 登录页重置密码。
 exports.changePasswordInLogin = (req, res) => {
   const user = req.body
   user.newPassword = bcrypt.hashSync(user.newPassword, 10)
@@ -160,14 +154,11 @@ exports.changePasswordInLogin = (req, res) => {
   })
 }
 
-// ----------------------------------------用户管理
-// 添加管理员
+// 用户管理：创建管理员账号。
 exports.createAdmin = (req, res) => {
   const { account, password, name, sex, department, email, identity } = req.body
-  // 判断账号是否存在与数据库中
   const sql = 'select * from users where account = ?'
   db.query(sql, account, (err, results) => {
-    // 判断账号是否存在
     if (results.length > 0) {
       return res.send({
         status: 1,
@@ -175,9 +166,7 @@ exports.createAdmin = (req, res) => {
       })
     }
     const hashpassword = bcrypt.hashSync(password, 10)
-    // 第四步,把账号跟密码插入到users表里面
     const sql1 = 'insert into users set ?'
-    // 创建时间
     const create_time = new Date()
     db.query(
       sql1,
@@ -188,16 +177,11 @@ exports.createAdmin = (req, res) => {
         sex,
         department,
         email,
-        // 身份
         identity,
-        // 创建时间
         create_time,
-        // 初始未冻结状态为0
         status: 0,
       },
       (err, results) => {
-        // 第一个,插入失败
-        // affectedRows为影响的行数，如果插入失败，那么就没有影响到行数，也就是行数不为1
         if (results.affectedRows !== 1) {
           return res.send({
             status: 1,
@@ -213,7 +197,7 @@ exports.createAdmin = (req, res) => {
   })
 }
 
-// 获取管理员列表 参数是 identity
+// 按身份获取管理员列表。
 exports.getAdminList = (req, res) => {
   const sql = 'select * from users where identity = ?'
   db.query(sql, req.body.identity, (err, result) => {
@@ -227,14 +211,14 @@ exports.getAdminList = (req, res) => {
     res.send(result)
   })
 }
-// 编辑管理员账号信息
+
+// 编辑管理员信息。
 exports.editAdmin = (req, res) => {
   const { id, name, sex, email, department } = req.body
   const date = new Date()
   const sql0 = 'select department from users where id = ?'
   db.query(sql0, id, (err, result) => {
     if (result[0].department == department) {
-      // 修改的内容
       const updateContent = {
         id,
         name,
@@ -252,7 +236,6 @@ exports.editAdmin = (req, res) => {
         })
       })
     } else {
-      // 修改的内容
       const updateContent = {
         id,
         name,
@@ -275,7 +258,7 @@ exports.editAdmin = (req, res) => {
   })
 }
 
-// 对管理员取消赋权 参数 id
+// 将管理员降级为普通用户。
 exports.changeIdentityToUser = (req, res) => {
   const identity = '用户'
   const sql = 'update users set identity = ? where id = ?'
@@ -288,7 +271,7 @@ exports.changeIdentityToUser = (req, res) => {
   })
 }
 
-// 对用户进行赋权 参数 id identity
+// 为用户分配管理员身份。
 exports.changeIdentityToAdmin = (req, res) => {
   const date = new Date()
   const sql = 'update users set identity = ?,update_time = ? where id = ?'
@@ -301,7 +284,7 @@ exports.changeIdentityToAdmin = (req, res) => {
   })
 }
 
-// 通过账号对用户搜索 account identity
+// 按账号和身份搜索用户。
 exports.searchUser = (req, res) => {
   const { account, identity } = req.body
   const sql = 'select * from users where account = ? and identity = ?'
@@ -317,7 +300,7 @@ exports.searchUser = (req, res) => {
   })
 }
 
-// 通过部门对用户搜索 department
+// 按部门搜索普通用户。
 exports.searchUserByDepartment = (req, res) => {
   const sql = 'select * from users where department = ? and identity = "用户"'
   db.query(sql, req.body.department, (err, result) => {
@@ -330,7 +313,7 @@ exports.searchUserByDepartment = (req, res) => {
   })
 }
 
-// 冻结用户 通过id 把status 置为 1
+// 冻结用户。
 exports.banUser = (req, res) => {
   const status = 1
   const sql = 'update users set status = ? where id = ?'
@@ -343,7 +326,7 @@ exports.banUser = (req, res) => {
   })
 }
 
-// 解冻用户
+// 解冻用户。
 exports.hotUser = (req, res) => {
   const status = 0
   const sql = 'update users set status = ? where id = ?'
@@ -356,7 +339,7 @@ exports.hotUser = (req, res) => {
   })
 }
 
-// 获取冻结用户列表
+// 获取冻结用户列表。
 exports.getBanList = (req, res) => {
   const sql = 'select * from users where status = "1" '
   db.query(sql, (err, result) => {
@@ -365,7 +348,7 @@ exports.getBanList = (req, res) => {
   })
 }
 
-// 删除用户 id account
+// 删除用户及其头像绑定记录。
 exports.deleteUser = (req, res) => {
   const sql = 'delete from users where id = ?'
   db.query(sql, req.body.id, (err, result) => {
@@ -381,7 +364,7 @@ exports.deleteUser = (req, res) => {
   })
 }
 
-// 获取对应身份的一个总人数 identity
+// 获取指定身份总人数。
 exports.getAdminListLength = (req, res) => {
   const sql = 'select * from users where identity = ? '
   db.query(sql, req.body.identity, (err, result) => {
@@ -392,8 +375,7 @@ exports.getAdminListLength = (req, res) => {
   })
 }
 
-// 监听换页返回数据 页码 pager identity
-// limit 10 为我们要拿到数据 offset 我们跳过多少条数据
+// 分页获取用户列表，每页 10 条。
 exports.returnListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from users where identity = ? ORDER BY create_time limit 10 offset ${number} `
