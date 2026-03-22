@@ -1,22 +1,80 @@
 const db = require('../db/index.js')
 const bcrypt = require('bcrypt')
-const jwt = require('jsonwebtoken')
-const jwtconfig = require('../jwt_config/index.js')
+const jwtconfig = require('../jwt_config')
+const {
+  issueTokenPair,
+  revokeRefreshToken,
+  rotateRefreshToken,
+  verifyRefreshToken,
+} = require('../services/token')
 
-// 注册账号。
-exports.register = (req, res) => {
+const REFRESH_COOKIE_NAME = 'refreshToken'
+
+const query = (sql, values = []) =>
+  new Promise((resolve, reject) => {
+    db.query(sql, values, (err, results) => {
+      if (err) {
+        reject(err)
+        return
+      }
+
+      resolve(results)
+    })
+  })
+
+const parseExpiresInToMs = (value) => {
+  const match = String(value)
+    .trim()
+    .match(/^(\d+)([smhd])$/i)
+
+  if (!match) {
+    throw new Error('不支持的 token 过期配置')
+  }
+
+  const amount = Number(match[1])
+  const unit = match[2].toLowerCase()
+
+  if (unit === 's') return amount * 1000
+  if (unit === 'm') return amount * 60 * 1000
+  if (unit === 'h') return amount * 60 * 60 * 1000
+  return amount * 24 * 60 * 60 * 1000
+}
+
+const getRefreshCookieOptions = () => ({
+  httpOnly: true,
+  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  path: '/api',
+  maxAge: parseExpiresInToMs(jwtconfig.refreshTokenExpiresIn),
+})
+
+const setRefreshTokenCookie = (res, refreshToken) => {
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshCookieOptions())
+}
+
+const clearRefreshTokenCookie = (res) => {
+  res.clearCookie(REFRESH_COOKIE_NAME, {
+    ...getRefreshCookieOptions(),
+    maxAge: undefined,
+  })
+}
+
+const findUserByAccount = (account) => query('select * from users where account = ?', [account])
+
+const findUserById = (id) => query('select * from users where id = ?', [id])
+
+exports.register = async (req, res) => {
   const regInfo = req.body
 
   if (!regInfo.account || !regInfo.password) {
     return res.send({
       status: 1,
-      message: '账号或者密码不能为空',
+      message: '账号或密码不能为空',
     })
   }
 
-  const querySql = 'select * from users where account = ?'
-  db.query(querySql, regInfo.account, (err, results) => {
-    if (err) return res.cc(err)
+  try {
+    const results = await query('select * from users where account = ?', [regInfo.account])
 
     if (results.length > 0) {
       return res.send({
@@ -26,95 +84,143 @@ exports.register = (req, res) => {
     }
 
     const hashedPassword = bcrypt.hashSync(regInfo.password, 10)
-    const insertSql = 'insert into users set ?'
+    const insertResult = await query('insert into users set ?', {
+      account: regInfo.account,
+      password: hashedPassword,
+      identity: '用户',
+      create_time: new Date(),
+      status: 0,
+    })
 
-    db.query(
-      insertSql,
-      {
-        account: regInfo.account,
-        password: hashedPassword,
-        identity: '用户',
-        create_time: new Date(),
-        status: 0,
-      },
-      (insertErr, insertResult) => {
-        if (insertErr) return res.cc(insertErr)
+    if (insertResult.affectedRows !== 1) {
+      return res.send({
+        status: 1,
+        message: '注册账号失败',
+      })
+    }
 
-        if (insertResult.affectedRows !== 1) {
-          return res.send({
-            status: 1,
-            message: '注册账号失败',
-          })
-        }
-
-        res.send({
-          status: 0,
-          message: '注册账号成功',
-        })
-      }
-    )
-  })
+    res.send({
+      status: 0,
+      message: '注册账号成功',
+    })
+  } catch (error) {
+    res.cc(error)
+  }
 }
 
-// 登录并签发访问令牌。
-exports.login = (req, res) => {
+exports.login = async (req, res) => {
   const logInfo = req.body
-  const sql = 'select * from users where account = ?'
 
-  db.query(sql, logInfo.account, (err, results) => {
-    if (err) return res.cc(err)
+  try {
+    const results = await findUserByAccount(logInfo.account)
     if (results.length !== 1) return res.cc('登录失败')
 
-    const compareResult = bcrypt.compareSync(logInfo.password, results[0].password)
+    const user = results[0]
+    const compareResult = bcrypt.compareSync(logInfo.password, user.password)
     if (!compareResult) {
       return res.cc('登录失败')
     }
 
-    if (results[0].status == 1) {
+    if (user.status == 1) {
       return res.cc('账号被冻结')
     }
 
-    const user = {
-      ...results[0],
-      password: '',
-      imageUrl: '',
-      create_time: '',
-      update_time: '',
-    }
-
-    const tokenStr = jwt.sign(user, jwtconfig.jwtSecretKey, {
-      expiresIn: '7h',
-    })
+    // 登录成功后下发 access token，并通过 HttpOnly Cookie 写入 refresh token。
+    const tokens = await issueTokenPair(user)
+    setRefreshTokenCookie(res, tokens.refreshToken)
 
     res.send({
-      results: results[0],
+      results: user,
       status: 0,
       message: '登录成功',
-      token: 'Bearer ' + tokenStr,
+      token: tokens.accessToken,
+      accessToken: tokens.accessToken,
     })
-  })
+  } catch (error) {
+    res.cc(error)
+  }
 }
 
-// 超级管理员菜单。
+exports.refreshToken = async (req, res) => {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME]
+
+  if (!refreshToken) {
+    return res.status(401).send({
+      status: 401,
+      message: '缺少 RefreshToken',
+    })
+  }
+
+  let decoded
+  try {
+    // refresh 接口不依赖 access token，因此要单独校验 Cookie 内的 refresh token。
+    decoded = await verifyRefreshToken(refreshToken)
+  } catch (error) {
+    clearRefreshTokenCookie(res)
+    return res.status(401).send({
+      status: 401,
+      message: error.message,
+    })
+  }
+
+  try {
+    const results = await findUserById(decoded.id)
+    if (results.length !== 1) {
+      await revokeRefreshToken(refreshToken)
+      clearRefreshTokenCookie(res)
+      return res.status(401).send({
+        status: 401,
+        message: '用户不存在，请重新登录',
+      })
+    }
+
+    const user = results[0]
+    if (user.status == 1) {
+      await revokeRefreshToken(refreshToken)
+      clearRefreshTokenCookie(res)
+      return res.status(401).send({
+        status: 401,
+        message: '账号被冻结，请重新登录',
+      })
+    }
+
+    // 每次刷新都旋转 refresh token，并重新写入新的 HttpOnly Cookie。
+    const tokens = await rotateRefreshToken(refreshToken, user)
+    setRefreshTokenCookie(res, tokens.refreshToken)
+
+    res.send({
+      status: 0,
+      message: '刷新成功',
+      accessToken: tokens.accessToken,
+    })
+  } catch (error) {
+    res.cc(error)
+  }
+}
+
+exports.logout = async (req, res) => {
+  const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME]
+
+  try {
+    if (refreshToken) {
+      await revokeRefreshToken(refreshToken)
+    }
+
+    clearRefreshTokenCookie(res)
+
+    res.send({
+      status: 0,
+      message: '退出登录成功',
+    })
+  } catch (error) {
+    res.cc(error)
+  }
+}
+
 const superAdminRouter = [
-  {
-    name: 'home',
-    path: '/home',
-    meta: { title: '首页' },
-    component: 'home/index',
-  },
-  {
-    name: 'set',
-    path: '/set',
-    meta: { title: '设置' },
-    component: 'set/index',
-  },
-  {
-    name: 'overview',
-    path: '/overview',
-    meta: { title: '系统概览' },
-    component: 'overview/index',
-  },
+  { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
+  { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },
+  { name: 'overview', path: '/overview', meta: { title: '系统概览' }, component: 'overview/index' },
   {
     name: 'product_manage',
     path: '/product_manage',
@@ -163,12 +269,7 @@ const superAdminRouter = [
     meta: { title: '回收站' },
     component: 'message/recycle/index',
   },
-  {
-    name: 'file',
-    path: '/file',
-    meta: { title: '文件管理' },
-    component: 'file/index',
-  },
+  { name: 'file', path: '/file', meta: { title: '文件管理' }, component: 'file/index' },
   {
     name: 'operation_log',
     path: '/operation_log',
@@ -183,20 +284,9 @@ const superAdminRouter = [
   },
 ]
 
-// 用户管理员菜单。
 const userAdminRouter = [
-  {
-    name: 'home',
-    path: '/home',
-    meta: { title: '首页' },
-    component: 'home/index',
-  },
-  {
-    name: 'set',
-    path: '/set',
-    meta: { title: '设置' },
-    component: 'set/index',
-  },
+  { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
+  { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },
   {
     name: 'user_list',
     path: '/user_list',
@@ -209,28 +299,12 @@ const userAdminRouter = [
     meta: { title: '用户管理' },
     component: 'user_manage/users_manage/index',
   },
-  {
-    name: 'file',
-    path: '/file',
-    meta: { title: '文件管理' },
-    component: 'file/index',
-  },
+  { name: 'file', path: '/file', meta: { title: '文件管理' }, component: 'file/index' },
 ]
 
-// 产品管理员菜单。
 const productAdminRouter = [
-  {
-    name: 'home',
-    path: '/home',
-    meta: { title: '首页' },
-    component: 'home/index',
-  },
-  {
-    name: 'set',
-    path: '/set',
-    meta: { title: '设置' },
-    component: 'set/index',
-  },
+  { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
+  { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },
   {
     name: 'product_manage_list',
     path: '/product_manage_list',
@@ -243,28 +317,12 @@ const productAdminRouter = [
     meta: { title: '出库管理' },
     component: 'product/out_product_manage_list/index',
   },
-  {
-    name: 'file',
-    path: '/file',
-    meta: { title: '文件管理' },
-    component: 'file/index',
-  },
+  { name: 'file', path: '/file', meta: { title: '文件管理' }, component: 'file/index' },
 ]
 
-// 消息管理员菜单。
 const messageAdminRouter = [
-  {
-    name: 'home',
-    path: '/home',
-    meta: { title: '首页' },
-    component: 'home/index',
-  },
-  {
-    name: 'set',
-    path: '/set',
-    meta: { title: '设置' },
-    component: 'set/index',
-  },
+  { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
+  { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },
   {
     name: 'message_list',
     path: '/message_list',
@@ -277,28 +335,12 @@ const messageAdminRouter = [
     meta: { title: '回收站' },
     component: 'message/recycle/index',
   },
-  {
-    name: 'file',
-    path: '/file',
-    meta: { title: '文件管理' },
-    component: 'file/index',
-  },
+  { name: 'file', path: '/file', meta: { title: '文件管理' }, component: 'file/index' },
 ]
 
-// 普通用户菜单。
 const userRouter = [
-  {
-    name: 'home',
-    path: '/home',
-    meta: { title: '首页' },
-    component: 'home/index',
-  },
-  {
-    name: 'set',
-    path: '/set',
-    meta: { title: '设置' },
-    component: 'set/index',
-  },
+  { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
+  { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },
   {
     name: 'product_manage_list',
     path: '/product_manage_list',
@@ -311,18 +353,11 @@ const userRouter = [
     meta: { title: '出库管理' },
     component: 'product/out_product_manage_list/index',
   },
-  {
-    name: 'file',
-    path: '/file',
-    meta: { title: '文件管理' },
-    component: 'file/index',
-  },
+  { name: 'file', path: '/file', meta: { title: '文件管理' }, component: 'file/index' },
 ]
 
-// 按用户身份返回菜单。
 exports.returnMenuList = (req, res) => {
-  const sql = 'select identity from users where id = ?'
-  db.query(sql, req.body.id, (err, result) => {
+  db.query('select identity from users where id = ?', req.body.id, (err, result) => {
     if (err) return res.cc(err)
 
     let menu = []

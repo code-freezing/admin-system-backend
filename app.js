@@ -20,8 +20,27 @@ const depMsgRouter = require('./router/department_msg.js')
 
 const app = express()
 
-// 允许跨域请求。
-app.use(cors())
+const parseCookies = (cookieHeader = '') => {
+  return cookieHeader.split(';').reduce((cookies, chunk) => {
+    const [rawKey, ...rest] = chunk.split('=')
+    const key = rawKey?.trim()
+
+    if (!key) {
+      return cookies
+    }
+
+    cookies[key] = decodeURIComponent(rest.join('=').trim())
+    return cookies
+  }, {})
+}
+
+// 允许跨域请求，并允许浏览器携带 HttpOnly Cookie。
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+)
 
 // 统一解析请求体。
 app.use(bodyParser.urlencoded({ extended: false }))
@@ -33,6 +52,12 @@ app.use(upload.any())
 
 // 将 public 目录作为静态资源目录。
 app.use(express.static('./public'))
+
+// 提前解析 Cookie，refresh 接口会从 HttpOnly Cookie 中读取 refresh token。
+app.use((req, res, next) => {
+  req.cookies = parseCookies(req.headers.cookie)
+  next()
+})
 
 // 给每个请求挂载统一错误返回方法，便于业务层直接调用 res.cc。
 app.use((req, res, next) => {
@@ -48,7 +73,7 @@ app.use((req, res, next) => {
 // 开启 JWT 鉴权，并放行登录与忘记密码相关接口。
 app.use(
   jwt({
-    secret: jwtconfig.jwtSecretKey,
+    secret: jwtconfig.accessTokenSecretKey,
     algorithms: ['HS256'],
   }).unless({
     path: [/^\/api\//, /^\/user\/verifyAccountAndEmail$/, /^\/user\/changePasswordInLogin$/],
@@ -67,25 +92,25 @@ app.use('/olog', operationLogRouter)
 app.use('/ov', overviewLogRouter)
 app.use('/dm', depMsgRouter)
 
-// 统一处理参数校验和鉴权错误，其他错误走兜底分支。
+// 统一处理参数校验和鉴权错误，其它错误走兜底分支。
 app.use((err, req, res, next) => {
   if (err instanceof Joi.ValidationError) {
-    return res.send({
+    return res.status(400).send({
       status: 1,
       message: '输入的数据不符合验证规则',
     })
   }
 
   if (err.name === 'UnauthorizedError') {
-    return res.send({
+    return res.status(401).send({
       status: 401,
-      message: '无效的Token',
+      message: '无效的 Token',
     })
   }
 
-  return res.send({
+  return res.status(500).send({
     status: 500,
-    message: err.message || '未知的错误',
+    message: err.message || '未知错误',
   })
 })
 
