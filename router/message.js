@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const messageHandler = require('../router_handle/message')
 
-// 公告消息路由。
+// 公告消息接口，涵盖发布、筛选、回收站和分页查询。
 router.post('/publishMessage', messageHandler.publishMessage)
 router.post('/companyMessageList', messageHandler.companyMessageList)
 router.post('/systemMessageList', messageHandler.systemMessageList)

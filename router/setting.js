@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const settingHandler = require('../router_handle/setting')
 
-// 系统设置路由。
+// 系统设置接口：轮播图、公司信息、部门配置和产品分类。
 router.post('/uploadSwiper', settingHandler.uploadSwiper)
 router.post('/getAllSwiper', settingHandler.getAllSwiper)
 router.post('/getCompanyName', settingHandler.getCompanyName)

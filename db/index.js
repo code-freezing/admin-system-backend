@@ -1,6 +1,6 @@
 const mysql = require('mysql')
 
-// 使用连接池统一管理数据库连接，避免每次请求都新建连接。
+// 统一使用连接池管理数据库连接，避免每次请求都重新创建连接。
 const db = mysql.createPool({
   host: 'localhost',
   user: 'back_system',

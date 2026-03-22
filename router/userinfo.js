@@ -9,7 +9,7 @@ const {
   forgetPassword_limit,
 } = require('../limit/user.js')
 
-// 用户资料与账号安全路由。
+// 用户资料与账号安全接口。
 router.post('/uploadAvatar', userHandler.uploadAvatar)
 router.post('/bindAccount', userHandler.bindAccount)
 router.post('/changePassword', expressJoi(password_limit), userHandler.changePassword)
@@ -24,7 +24,7 @@ router.post(
   userHandler.changePasswordInLogin
 )
 
-// 用户管理路由。
+// 后台用户管理接口。
 router.post('/createAdmin', userHandler.createAdmin)
 router.post('/getAdminList', userHandler.getAdminList)
 router.post('/editAdmin', userHandler.editAdmin)

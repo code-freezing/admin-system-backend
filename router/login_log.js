@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const loginLogHandler = require('../router_handle/login_log.js')
 
-// 登录日志路由。
+// 登录日志接口：写日志、分页查询、筛选和清空。
 router.post('/loginLog', loginLogHandler.loginLog)
 router.post('/loginLogList', loginLogHandler.loginLogList)
 router.post('/searchLoginLogList', loginLogHandler.searchLoginLogList)

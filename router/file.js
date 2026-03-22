@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const fileHandler = require('../router_handle/file')
 
-// 文件管理路由。
+// 文件管理接口：上传、下载、列表、搜索和删除。
 router.post('/uploadFile', fileHandler.uploadFile)
 router.post('/bindFileAndUser', fileHandler.bindFileAndUser)
 router.post('/updateDownload', fileHandler.updateDownload)

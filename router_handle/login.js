@@ -10,6 +10,7 @@ const {
 
 const REFRESH_COOKIE_NAME = 'refreshToken'
 
+// 这个文件既处理账号登录，也负责双 token 的刷新与注销。
 const query = (sql, values = []) =>
   new Promise((resolve, reject) => {
     db.query(sql, values, (err, results) => {
@@ -40,6 +41,7 @@ const parseExpiresInToMs = (value) => {
   return amount * 24 * 60 * 60 * 1000
 }
 
+// refresh token 放到 HttpOnly Cookie，浏览器会自动带上，前端 JS 读不到它。
 const getRefreshCookieOptions = () => ({
   httpOnly: true,
   sameSite: 'lax',
@@ -125,7 +127,7 @@ exports.login = async (req, res) => {
       return res.cc('账号被冻结')
     }
 
-    // 登录成功后下发 access token，并通过 HttpOnly Cookie 写入 refresh token。
+    // 登录成功后返回 access token，并把 refresh token 写进 Cookie。
     const tokens = await issueTokenPair(user)
     setRefreshTokenCookie(res, tokens.refreshToken)
 
@@ -153,7 +155,7 @@ exports.refreshToken = async (req, res) => {
 
   let decoded
   try {
-    // refresh 接口不依赖 access token，因此要单独校验 Cookie 内的 refresh token。
+    // refresh 接口不需要 access token，它只依赖 Cookie 内的 refresh token。
     decoded = await verifyRefreshToken(refreshToken)
   } catch (error) {
     clearRefreshTokenCookie(res)
@@ -184,7 +186,7 @@ exports.refreshToken = async (req, res) => {
       })
     }
 
-    // 每次刷新都旋转 refresh token，并重新写入新的 HttpOnly Cookie。
+    // 每次刷新都会旋转 refresh token，旧 token 会在数据库里被撤销。
     const tokens = await rotateRefreshToken(refreshToken, user)
     setRefreshTokenCookie(res, tokens.refreshToken)
 
@@ -217,6 +219,7 @@ exports.logout = async (req, res) => {
   }
 }
 
+// 下面这几组菜单数据由后端按用户身份返回，前端再据此动态注册路由。
 const superAdminRouter = [
   { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
   { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },

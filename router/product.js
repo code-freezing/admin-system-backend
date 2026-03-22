@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const productHandler = require('../router_handle/product')
 
-// 产品库存与出库路由。
+// 产品库存、出库申请、审核和历史出库记录接口。
 router.post('/createProduct', productHandler.createProduct)
 router.post('/deleteProduct', productHandler.deleteProduct)
 router.post('/editProduct', productHandler.editProduct)

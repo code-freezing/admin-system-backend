@@ -20,6 +20,7 @@ const depMsgRouter = require('./router/department_msg.js')
 
 const app = express()
 
+// 当前项目没有额外引入 cookie-parser，这里自己做一个最小版 Cookie 解析。
 const parseCookies = (cookieHeader = '') => {
   return cookieHeader.split(';').reduce((cookies, chunk) => {
     const [rawKey, ...rest] = chunk.split('=')
@@ -34,7 +35,7 @@ const parseCookies = (cookieHeader = '') => {
   }, {})
 }
 
-// 允许跨域请求，并允许浏览器携带 HttpOnly Cookie。
+// 允许跨域，并允许浏览器在跨域请求时自动带上 HttpOnly Cookie。
 app.use(
   cors({
     origin: true,
@@ -42,24 +43,24 @@ app.use(
   })
 )
 
-// 统一解析请求体。
+// 统一解析普通表单和 JSON 请求体。
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
-// 解析 multipart/form-data，上传接口会使用 req.files。
+// 上传接口使用 multipart/form-data，这里统一把文件解析到 req.files。
 const upload = multer({ dest: './public/upload' })
 app.use(upload.any())
 
-// 将 public 目录作为静态资源目录。
+// public 目录既存放上传文件，也直接对外提供静态访问。
 app.use(express.static('./public'))
 
-// 提前解析 Cookie，refresh 接口会从 HttpOnly Cookie 中读取 refresh token。
+// refresh token 放在 HttpOnly Cookie 里，进入业务前先把 Cookie 解析出来。
 app.use((req, res, next) => {
   req.cookies = parseCookies(req.headers.cookie)
   next()
 })
 
-// 给每个请求挂载统一错误返回方法，便于业务层直接调用 res.cc。
+// res.cc 是项目里统一的错误返回助手，业务层可以少写重复样板代码。
 app.use((req, res, next) => {
   res.cc = (err, status = 1) => {
     res.send({
@@ -70,7 +71,8 @@ app.use((req, res, next) => {
   next()
 })
 
-// 开启 JWT 鉴权，并放行登录与忘记密码相关接口。
+// JWT 中间件只校验 access token。
+// /api 下的认证接口、找回密码接口不需要先登录，所以要放行。
 app.use(
   jwt({
     secret: jwtconfig.accessTokenSecretKey,
@@ -80,7 +82,7 @@ app.use(
   })
 )
 
-// 注册业务路由。
+// 这里把不同业务模块挂到不同的路径前缀，便于按模块拆分文件。
 app.use('/api', loginRouter)
 app.use('/user', userRouter)
 app.use('/set', setRouter)
@@ -92,7 +94,7 @@ app.use('/olog', operationLogRouter)
 app.use('/ov', overviewLogRouter)
 app.use('/dm', depMsgRouter)
 
-// 统一处理参数校验和鉴权错误，其它错误走兜底分支。
+// 统一兜底处理参数校验错误、JWT 鉴权错误和未捕获异常。
 app.use((err, req, res, next) => {
   if (err instanceof Joi.ValidationError) {
     return res.status(400).send({

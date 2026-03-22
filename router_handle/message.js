@@ -1,6 +1,8 @@
 const db = require('../db/index')
 
-// 发布消息。
+// 消息模块负责公告发布、筛选、详情、回收站和分页统计。
+// message_status 为 0 表示正常消息，为 1 表示已进入回收站。
+
 exports.publishMessage = (req, res) => {
   const {
     message_title,
@@ -39,7 +41,7 @@ exports.publishMessage = (req, res) => {
   )
 }
 
-// 获取公司公告列表。
+// 首页公告面板只取最新 5 条，避免一次加载过多历史数据。
 exports.companyMessageList = (req, res) => {
   const sql =
     'select * from message where message_category = "公司公告" and message_status = "0" order by message_publish_time DESC limit 5'
@@ -49,7 +51,6 @@ exports.companyMessageList = (req, res) => {
   })
 }
 
-// 获取系统消息列表。
 exports.systemMessageList = (req, res) => {
   const sql =
     'select * from message where message_category = "系统消息" and message_status = "0"  order by message_publish_time DESC limit 5'
@@ -59,7 +60,7 @@ exports.systemMessageList = (req, res) => {
   })
 }
 
-// 编辑消息并同步部门未读列表。
+// 编辑消息时要同步 users.read_list，避免部门变更后未读消息状态错乱。
 exports.editMessage = (req, res) => {
   const {
     message_title,
@@ -69,31 +70,33 @@ exports.editMessage = (req, res) => {
     message_level,
     id,
   } = req.body
-  const returnOldDepartment = (id) => {
+  const returnOldDepartment = (messageId) => {
     return new Promise((resolve) => {
       const sql = 'select message_receipt_object from message where id = ?'
-      db.query(sql, id, (err, result) => {
+      db.query(sql, messageId, (err, result) => {
+        if (err) return resolve(null)
         resolve(result[0].message_receipt_object)
       })
     })
   }
-  const pushIdInReadList = (newDepartment, newid) => {
+
+  const pushIdInReadList = (newDepartment, newId) => {
     const sql = 'select read_list,read_status,id from users where department = ?'
     db.query(sql, newDepartment, (err, result) => {
       if (err) return res.cc(err)
       result.forEach((e) => {
         if (e.read_status == 1) {
           let arr = JSON.parse(e.read_list)
-          arr.push(JSON.parse(newid))
+          arr.push(JSON.parse(newId))
           arr = JSON.stringify(arr)
           const sql1 = 'update users set read_list = ? where id = ?'
-          db.query(sql1, [arr, e.id], (err, result) => {})
+          db.query(sql1, [arr, e.id], () => {})
         }
       })
     })
   }
 
-  const deleteIdInReadList = (oldDepartment, deleteid) => {
+  const deleteIdInReadList = (oldDepartment, deleteId) => {
     const sql = 'select read_list,read_status,id from users where department = ?'
     db.query(sql, oldDepartment, (err, result) => {
       if (err) return res.cc(err)
@@ -101,11 +104,11 @@ exports.editMessage = (req, res) => {
         if (e.read_status == 1) {
           let arr = JSON.parse(e.read_list)
           arr = arr.filter((item) => {
-            return item != deleteid
+            return item != deleteId
           })
           arr = JSON.stringify(arr)
           const sql1 = 'update users set read_list = ? where id = ?'
-          db.query(sql1, [arr, e.id], (err, result) => {})
+          db.query(sql1, [arr, e.id], () => {})
         }
       })
     })
@@ -137,7 +140,7 @@ exports.editMessage = (req, res) => {
         message_update_time,
         id,
       ],
-      (err, result) => {
+      (err) => {
         if (err) return res.cc(err)
         res.send({
           status: 0,
@@ -149,7 +152,6 @@ exports.editMessage = (req, res) => {
   change()
 }
 
-// 按发布部门筛选消息。
 exports.searchMessageBydepartment = (req, res) => {
   const sql = 'select * from message where message_publish_department = ? and message_status = "0"'
   db.query(sql, req.body.message_publish_department, (err, result) => {
@@ -158,7 +160,6 @@ exports.searchMessageBydepartment = (req, res) => {
   })
 }
 
-// 按消息等级筛选消息。
 exports.searchMessageByLevel = (req, res) => {
   const sql = 'select * from message where message_level = ? and message_status = "0"'
   db.query(sql, req.body.message_level, (err, result) => {
@@ -167,7 +168,6 @@ exports.searchMessageByLevel = (req, res) => {
   })
 }
 
-// 获取消息详情。
 exports.getMessage = (req, res) => {
   const sql = 'select * from message where id = ?'
   db.query(sql, req.body.id, (err, result) => {
@@ -176,12 +176,12 @@ exports.getMessage = (req, res) => {
   })
 }
 
-// 增加点击次数。
+// 点击量在后端累加，避免前端直接提交新值造成并发覆盖。
 exports.updateClick = (req, res) => {
   const { message_click_number, id } = req.body
   const number = message_click_number * 1 + 1
   const sql = 'update message set message_click_number = ? where id = ?'
-  db.query(sql, [number, id], (err, result) => {
+  db.query(sql, [number, id], (err) => {
     if (err) return res.cc(err)
     res.send({
       status: 0,
@@ -190,12 +190,12 @@ exports.updateClick = (req, res) => {
   })
 }
 
-// 软删除消息到回收站。
+// 删除流程分成软删除、恢复和永久删除，便于后台做回收站管理。
 exports.firstDelete = (req, res) => {
   const message_status = 1
   const message_delete_time = new Date()
   const sql = 'update message set message_status = ? ,message_delete_time = ? where id = ?'
-  db.query(sql, [message_status, message_delete_time, req.body.id], (err, result) => {
+  db.query(sql, [message_status, message_delete_time, req.body.id], (err) => {
     if (err) return res.cc(err)
     res.send({
       status: 0,
@@ -204,7 +204,6 @@ exports.firstDelete = (req, res) => {
   })
 }
 
-// 获取回收站列表。
 exports.recycleList = (req, res) => {
   const sql = 'select * from message where message_status = 1'
   db.query(sql, (err, result) => {
@@ -213,7 +212,6 @@ exports.recycleList = (req, res) => {
   })
 }
 
-// 获取回收站总数。
 exports.getRecycleMessageLength = (req, res) => {
   const sql = 'select * from message where message_status = 1'
   db.query(sql, (err, result) => {
@@ -224,7 +222,6 @@ exports.getRecycleMessageLength = (req, res) => {
   })
 }
 
-// 分页获取回收站数据。
 exports.returnRecycleListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from message where message_status = 1 ORDER BY message_delete_time limit 10 offset ${number} `
@@ -234,12 +231,11 @@ exports.returnRecycleListData = (req, res) => {
   })
 }
 
-// 从回收站还原消息。
 exports.recover = (req, res) => {
   const message_status = 0
   const message_update_time = new Date()
   const sql = 'update message set message_status = ? ,message_update_time = ? where id = ?'
-  db.query(sql, [message_status, message_update_time, req.body.id], (err, result) => {
+  db.query(sql, [message_status, message_update_time, req.body.id], (err) => {
     if (err) return res.cc(err)
     res.send({
       status: 0,
@@ -248,10 +244,9 @@ exports.recover = (req, res) => {
   })
 }
 
-// 永久删除消息。
 exports.deleteMessage = (req, res) => {
   const sql = 'delete from message where id = ?'
-  db.query(sql, req.body.id, (err, result) => {
+  db.query(sql, req.body.id, (err) => {
     if (err) return res.cc(err)
     res.send({
       status: 0,
@@ -260,7 +255,7 @@ exports.deleteMessage = (req, res) => {
   })
 }
 
-// 获取公司公告总数。
+// 公司公告和系统消息共用同一张表，只靠 message_category 区分。
 exports.getCompanyMessageLength = (req, res) => {
   const sql = 'select * from message where message_category ="公司公告"'
   db.query(sql, (err, result) => {
@@ -271,7 +266,6 @@ exports.getCompanyMessageLength = (req, res) => {
   })
 }
 
-// 获取系统消息总数。
 exports.getSystemMessageLength = (req, res) => {
   const sql = 'select * from message where message_category ="系统消息"'
   db.query(sql, (err, result) => {
@@ -282,7 +276,6 @@ exports.getSystemMessageLength = (req, res) => {
   })
 }
 
-// 分页获取公司公告列表。
 exports.returnCompanyListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from message where message_category ="公司公告" and message_status = 0 ORDER BY message_publish_time limit 10 offset ${number} `
@@ -292,7 +285,6 @@ exports.returnCompanyListData = (req, res) => {
   })
 }
 
-// 分页获取系统消息列表。
 exports.returnSystemListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `select * from message where message_category ="系统消息"  and message_status = 0  ORDER BY message_publish_time limit 10 offset ${number} `

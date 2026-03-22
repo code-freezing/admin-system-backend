@@ -1,12 +1,16 @@
 const db = require('../db/index')
 const moment = require('moment')
 
-// 统计各产品类别对应的库存总价。
+// 概览页统计接口负责把零散业务表整理成图表友好的结构。
+// 这里多数查询都保持简单，优先服务页面展示而不是做复杂报表。
+
+// 先读取产品分类配置，再逐类汇总库存总价。
 exports.getCategoryAndNumber = (req, res) => {
   const loadCategoryArray = () => {
     return new Promise((resolve) => {
       const sql = 'select set_value from setting where set_name = "产品设置"'
       db.query(sql, (err, result) => {
+        if (err) return resolve([])
         const str = result[0].set_value
         const arr = eval('(' + str + ')')
         resolve(arr)
@@ -18,9 +22,10 @@ exports.getCategoryAndNumber = (req, res) => {
     return new Promise((resolve) => {
       const sql = 'select product_all_price from product where product_category= ?'
       db.query(sql, productCategory, (err, result) => {
+        if (err) return resolve(0)
         let total = 0
         for (let i = 0; i < result.length; i++) {
-          total += result[i]['product_all_price']
+          total += result[i].product_all_price
         }
         resolve(total)
       })
@@ -42,12 +47,13 @@ exports.getCategoryAndNumber = (req, res) => {
   getAll()
 }
 
-// 统计各角色人数。
+// 身份分布图固定几个角色名称，便于前端直接渲染饼图。
 exports.getAdminAndNumber = (req, res) => {
   const loadCountByIdentity = (identity) => {
     return new Promise((resolve) => {
       const sql = 'select * from users where identity = ?'
       db.query(sql, identity, (err, result) => {
+        if (err) return resolve(0)
         resolve(result.length)
       })
     })
@@ -55,30 +61,15 @@ exports.getAdminAndNumber = (req, res) => {
 
   async function getAll() {
     const data = [
-      {
-        value: 0,
-        name: '超级管理员',
-      },
-      {
-        value: 0,
-        name: '产品管理员',
-      },
-      {
-        value: 0,
-        name: '用户管理员',
-      },
-      {
-        value: 0,
-        name: '消息管理员',
-      },
-      {
-        value: 0,
-        name: '用户',
-      },
+      { value: 0, name: '超级管理员' },
+      { value: 0, name: '产品管理员' },
+      { value: 0, name: '用户管理员' },
+      { value: 0, name: '消息管理员' },
+      { value: 0, name: '用户' },
     ]
 
     for (let i = 0; i < data.length; i++) {
-      data[i]['value'] = await loadCountByIdentity(data[i]['name'])
+      data[i].value = await loadCountByIdentity(data[i].name)
     }
 
     res.send({
@@ -89,12 +80,12 @@ exports.getAdminAndNumber = (req, res) => {
   getAll()
 }
 
-// 统计各消息等级数量。
 exports.getLevelAndNumber = (req, res) => {
   const loadCountByLevel = (messageLevel) => {
     return new Promise((resolve) => {
       const sql = 'select * from message where message_level = ?'
       db.query(sql, messageLevel, (err, result) => {
+        if (err) return resolve(0)
         resolve(result.length)
       })
     })
@@ -102,22 +93,13 @@ exports.getLevelAndNumber = (req, res) => {
 
   async function getAll() {
     const data = [
-      {
-        value: 0,
-        name: '一般',
-      },
-      {
-        value: 0,
-        name: '重要',
-      },
-      {
-        value: 0,
-        name: '必要',
-      },
+      { value: 0, name: '一般' },
+      { value: 0, name: '重要' },
+      { value: 0, name: '必要' },
     ]
 
     for (let i = 0; i < data.length; i++) {
-      data[i]['value'] = await loadCountByLevel(data[i]['name'])
+      data[i].value = await loadCountByLevel(data[i].name)
     }
 
     res.send({
@@ -128,7 +110,7 @@ exports.getLevelAndNumber = (req, res) => {
   getAll()
 }
 
-// 统计最近七天每日登录数。
+// 近七天登录图会回溯 7 个自然日，并统计 login_log 中每天的记录数量。
 exports.getDayAndNumber = (req, res) => {
   const getRecentDays = () => {
     let day = new Date()
@@ -146,6 +128,7 @@ exports.getDayAndNumber = (req, res) => {
     return new Promise((resolve) => {
       const sql = `select * from login_log where login_time like '%${loginDay}%'`
       db.query(sql, loginDay, (err, result) => {
+        if (err) return resolve(0)
         resolve(result.length)
       })
     })
@@ -153,7 +136,7 @@ exports.getDayAndNumber = (req, res) => {
 
   async function getAll() {
     const week = getRecentDays()
-    let number = []
+    const number = []
     for (let i = 0; i < week.length; i++) {
       number[i] = await loadLoginCountByDay(week[i])
     }

@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const departmentMessageHandler = require('../router_handle/department_msg.js')
 
-// 部门消息与未读列表路由。
+// 部门消息与未读列表接口。
 router.post('/getDepartmentMsg', departmentMessageHandler.getDepartmentMsg)
 router.post('/getDepartmentMsgList', departmentMessageHandler.getDepartmentMsgList)
 router.post('/getReadListAndStatus', departmentMessageHandler.getReadListAndStatus)

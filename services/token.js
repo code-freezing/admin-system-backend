@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken')
 const jwtconfig = require('../jwt_config')
 const { getRefreshToken, revokeRefreshToken, saveRefreshToken } = require('./refresh_token_store')
 
+// 项目里的过期时间配置是 "2h"、"7d" 这种形式，这里转成毫秒方便写数据库和 Cookie。
 const parseExpiresInToMs = (value) => {
   const match = String(value)
     .trim()
@@ -20,6 +21,7 @@ const parseExpiresInToMs = (value) => {
   return amount * 24 * 60 * 60 * 1000
 }
 
+// access token 里不需要放密码和时间戳这些无意义字段，先做一次净化。
 const sanitizeUser = (user) => ({
   ...user,
   password: '',
@@ -29,8 +31,9 @@ const sanitizeUser = (user) => ({
 })
 
 const issueTokenPair = async (user) => {
-  // access token 给业务接口鉴权，refresh token 只用于换新。
   const tokenUser = sanitizeUser(user)
+
+  // access token 给业务接口鉴权，refresh token 只用于换新。
   const accessToken = jwt.sign(tokenUser, jwtconfig.accessTokenSecretKey, {
     expiresIn: jwtconfig.accessTokenExpiresIn,
   })
@@ -60,7 +63,7 @@ const issueTokenPair = async (user) => {
 }
 
 const verifyRefreshToken = async (refreshToken) => {
-  // 数据库命中说明这个 refresh token 仍然有效且未被轮换或注销。
+  // 先查数据库，再验签；两边都通过才说明 refresh token 仍然可用。
   const storedToken = await getRefreshToken(refreshToken)
   if (!storedToken) {
     throw new Error('RefreshToken 已失效，请重新登录')
@@ -75,7 +78,7 @@ const verifyRefreshToken = async (refreshToken) => {
 }
 
 const rotateRefreshToken = async (refreshToken, user) => {
-  // 每次刷新都轮换 refresh token，避免旧 token 被重复利用。
+  // 刷新成功后立刻废弃旧 refresh token，并生成一对新的 token。
   await revokeRefreshToken(refreshToken)
   return issueTokenPair(user)
 }
