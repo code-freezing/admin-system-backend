@@ -1,3 +1,10 @@
+/**
+ * 模块说明：
+ * 1. refresh token 存储服务。
+ * 2. 负责把 refresh token 以哈希形式写入数据库，并提供查询、清理和撤销能力。
+ * 3. 它保证 refresh token 可以被单独失效，而不必依赖前端主动删除。
+ */
+
 const crypto = require('crypto')
 const db = require('../db')
 

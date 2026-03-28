@@ -1,3 +1,10 @@
+/**
+ * 模块说明：
+ * 1. 认证业务处理层。
+ * 2. 负责注册、登录、刷新 token、退出登录以及按身份返回菜单。
+ * 3. 这是后端登录态管理和前端动态菜单的核心桥梁。
+ */
+
 const db = require('../db/index.js')
 const bcrypt = require('bcrypt')
 const jwtconfig = require('../jwt_config')
@@ -7,6 +14,7 @@ const {
   rotateRefreshToken,
   verifyRefreshToken,
 } = require('../services/token')
+const { getRoleCodeByIdentity, replaceUserRoles } = require('../services/access_control')
 
 const REFRESH_COOKIE_NAME = 'refreshToken'
 
@@ -61,6 +69,7 @@ const clearRefreshTokenCookie = (res) => {
   })
 }
 
+// 这两个查询函数单独抽出，是为了让登录、刷新 token 等流程复用同一套取数方式。
 const findUserByAccount = (account) => query('select * from users where account = ?', [account])
 
 const findUserById = (id) => query('select * from users where id = ?', [id])
@@ -100,6 +109,8 @@ exports.register = async (req, res) => {
         message: '注册账号失败',
       })
     }
+
+    await replaceUserRoles(insertResult.insertId, [getRoleCodeByIdentity('用户')])
 
     res.send({
       status: 0,
@@ -168,6 +179,7 @@ exports.refreshToken = async (req, res) => {
   try {
     const results = await findUserById(decoded.id)
     if (results.length !== 1) {
+      // token 虽然合法，但用户可能已经被删除，此时也必须把旧会话清掉。
       await revokeRefreshToken(refreshToken)
       clearRefreshTokenCookie(res)
       return res.status(401).send({
@@ -178,6 +190,7 @@ exports.refreshToken = async (req, res) => {
 
     const user = results[0]
     if (user.status == 1) {
+      // 账号被冻结后，不允许继续通过 refresh token 延长会话。
       await revokeRefreshToken(refreshToken)
       clearRefreshTokenCookie(res)
       return res.status(401).send({
@@ -219,167 +232,31 @@ exports.logout = async (req, res) => {
   }
 }
 
-// 下面这几组菜单数据由后端按用户身份返回，前端再据此动态注册路由。
-const superAdminRouter = [
-  { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
-  { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },
-  { name: 'overview', path: '/overview', meta: { title: '系统概览' }, component: 'overview/index' },
-  {
-    name: 'product_manage',
-    path: '/product_manage',
-    meta: { title: '产品管理员' },
-    component: 'user_manage/product_manage/index',
-  },
-  {
-    name: 'message_manage',
-    path: '/message_manage',
-    meta: { title: '消息管理员' },
-    component: 'user_manage/message_manage/index',
-  },
-  {
-    name: 'user_list',
-    path: '/user_list',
-    meta: { title: '用户列表' },
-    component: 'user_manage/user_list/index',
-  },
-  {
-    name: 'users_manage',
-    path: '/users_manage',
-    meta: { title: '用户管理' },
-    component: 'user_manage/users_manage/index',
-  },
-  {
-    name: 'product_manage_list',
-    path: '/product_manage_list',
-    meta: { title: '产品管理' },
-    component: 'product/product_manage_list/index',
-  },
-  {
-    name: 'out_product_manage_list',
-    path: '/out_product_manage_list',
-    meta: { title: '出库管理' },
-    component: 'product/out_product_manage_list/index',
-  },
-  {
-    name: 'message_list',
-    path: '/message_list',
-    meta: { title: '消息管理' },
-    component: 'message/message_list/index',
-  },
-  {
-    name: 'recycle',
-    path: '/recycle',
-    meta: { title: '回收站' },
-    component: 'message/recycle/index',
-  },
-  { name: 'file', path: '/file', meta: { title: '文件管理' }, component: 'file/index' },
-  {
-    name: 'operation_log',
-    path: '/operation_log',
-    meta: { title: '操作日志' },
-    component: 'operation_log/index',
-  },
-  {
-    name: 'login_log',
-    path: '/login_log',
-    meta: { title: '登录日志' },
-    component: 'login_log/index',
-  },
-]
+exports.authProfile = async (req, res) => {
+  if (!req.accessContext) {
+    return res.status(401).send({
+      status: 401,
+      message: '无效的 Token',
+    })
+  }
 
-const userAdminRouter = [
-  { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
-  { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },
-  {
-    name: 'user_list',
-    path: '/user_list',
-    meta: { title: '用户列表' },
-    component: 'user_manage/user_list/index',
-  },
-  {
-    name: 'users_manage',
-    path: '/users_manage',
-    meta: { title: '用户管理' },
-    component: 'user_manage/users_manage/index',
-  },
-  { name: 'file', path: '/file', meta: { title: '文件管理' }, component: 'file/index' },
-]
-
-const productAdminRouter = [
-  { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
-  { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },
-  {
-    name: 'product_manage_list',
-    path: '/product_manage_list',
-    meta: { title: '产品管理' },
-    component: 'product/product_manage_list/index',
-  },
-  {
-    name: 'out_product_manage_list',
-    path: '/out_product_manage_list',
-    meta: { title: '出库管理' },
-    component: 'product/out_product_manage_list/index',
-  },
-  { name: 'file', path: '/file', meta: { title: '文件管理' }, component: 'file/index' },
-]
-
-const messageAdminRouter = [
-  { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
-  { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },
-  {
-    name: 'message_list',
-    path: '/message_list',
-    meta: { title: '消息管理' },
-    component: 'message/message_list/index',
-  },
-  {
-    name: 'recycle',
-    path: '/recycle',
-    meta: { title: '回收站' },
-    component: 'message/recycle/index',
-  },
-  { name: 'file', path: '/file', meta: { title: '文件管理' }, component: 'file/index' },
-]
-
-const userRouter = [
-  { name: 'home', path: '/home', meta: { title: '首页' }, component: 'home/index' },
-  { name: 'set', path: '/set', meta: { title: '设置' }, component: 'set/index' },
-  {
-    name: 'product_manage_list',
-    path: '/product_manage_list',
-    meta: { title: '产品管理' },
-    component: 'product/product_manage_list/index',
-  },
-  {
-    name: 'out_product_manage_list',
-    path: '/out_product_manage_list',
-    meta: { title: '出库管理' },
-    component: 'product/out_product_manage_list/index',
-  },
-  { name: 'file', path: '/file', meta: { title: '文件管理' }, component: 'file/index' },
-]
+  res.send({
+    status: 0,
+    message: '获取权限上下文成功',
+    user: req.accessContext.user,
+    roles: req.accessContext.roles,
+    permissionCodes: req.accessContext.permissionCodes,
+    menus: req.accessContext.menuTree,
+  })
+}
 
 exports.returnMenuList = (req, res) => {
-  db.query('select identity from users where id = ?', req.body.id, (err, result) => {
-    if (err) return res.cc(err)
+  if (!req.accessContext) {
+    return res.status(401).send({
+      status: 401,
+      message: '无效的 Token',
+    })
+  }
 
-    let menu = []
-    if (result[0].identity == '超级管理员') {
-      menu = superAdminRouter
-    }
-    if (result[0].identity == '用户管理员') {
-      menu = userAdminRouter
-    }
-    if (result[0].identity == '产品管理员') {
-      menu = productAdminRouter
-    }
-    if (result[0].identity == '消息管理员') {
-      menu = messageAdminRouter
-    }
-    if (result[0].identity == '用户') {
-      menu = userRouter
-    }
-
-    res.send(menu)
-  })
+  res.send(req.accessContext.menuTree)
 }

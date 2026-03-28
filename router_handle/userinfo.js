@@ -1,10 +1,51 @@
+/**
+ * 模块说明：
+ * 1. 用户资料与权限业务处理层。
+ * 2. 同时承载个人资料、头像上传、账号安全、用户管理和权限调整。
+ * 3. 这是后端最重的业务文件之一，理解它有助于读懂用户体系。
+ */
+
 const db = require('../db/index.js')
 const bcrypt = require('bcrypt')
 const crypto = require('crypto')
 const fs = require('fs')
+const {
+  getRoleCodeByIdentity,
+  hasAnyPermission,
+  hasPermission,
+  replaceUserRoles,
+} = require('../services/access_control')
 
 // 用户信息模块同时承载个人资料、找回密码和后台用户管理等能力。
 // 这里的大多数接口直接操作 users 表，少量会联动 image 表中的头像记录。
+
+const deny = (res) => {
+  return res.status(403).send({
+    status: 403,
+    message: '无权限访问',
+  })
+}
+
+const loadIdentityByUserId = (id) => {
+  return new Promise((resolve, reject) => {
+    db.query('select identity from users where id = ? limit 1', [id], (err, result) => {
+      if (err) {
+        reject(err)
+        return
+      }
+
+      resolve(result[0]?.identity || null)
+    })
+  })
+}
+
+const canReadIdentity = (req, identity) => {
+  if (identity === '用户') {
+    return hasAnyPermission(req.accessContext, ['api.user.user.read', 'api.user.admin.read'])
+  }
+
+  return hasPermission(req.accessContext, 'api.user.admin.read')
+}
 
 // 上传头像后先写入 image 表，并生成 onlyId 作为后续绑定账号的临时标识。
 exports.uploadAvatar = (req, res) => {
@@ -75,6 +116,14 @@ exports.changePassword = (req, res) => {
 
 // 获取当前用户资料时会把 password 清空，避免前端拿到哈希值。
 exports.getUserInfo = (req, res) => {
+  const currentUserId = req.accessContext?.user?.id
+  const targetUserId = Number(req.body.id)
+  const canReadOthers = hasAnyPermission(req.accessContext, ['api.user.user.read', 'api.user.admin.read'])
+
+  if (currentUserId !== targetUserId && !canReadOthers) {
+    return deny(res)
+  }
+
   const sql = 'select * from users where id = ?'
   db.query(sql, req.body.id, (err, result) => {
     if (err) return res.cc(err)
@@ -191,6 +240,9 @@ exports.createAdmin = (req, res) => {
             message: '添加管理员失败',
           })
         }
+
+        replaceUserRoles(insertResult.insertId, [getRoleCodeByIdentity(identity)]).catch(() => {})
+
         res.send({
           status: 0,
           message: '添加管理员成功',
@@ -202,6 +254,10 @@ exports.createAdmin = (req, res) => {
 
 // 列表返回前会抹掉不需要给表格展示的敏感字段。
 exports.getAdminList = (req, res) => {
+  if (!canReadIdentity(req, req.body.identity)) {
+    return deny(res)
+  }
+
   const sql = 'select * from users where identity = ?'
   db.query(sql, req.body.identity, (err, result) => {
     if (err) return res.cc(err)
@@ -216,9 +272,23 @@ exports.getAdminList = (req, res) => {
 }
 
 // 如果编辑时变更了部门，需要清空未读消息状态，避免旧部门消息继续挂在账号上。
-exports.editAdmin = (req, res) => {
+exports.editAdmin = async (req, res) => {
   const { id, name, sex, email, department } = req.body
   const date = new Date()
+  try {
+    const targetIdentity = await loadIdentityByUserId(id)
+    const allowEdit =
+      targetIdentity === '用户'
+        ? hasAnyPermission(req.accessContext, ['api.user.user.edit', 'api.user.admin.edit'])
+        : hasPermission(req.accessContext, 'api.user.admin.edit')
+
+    if (!allowEdit) {
+      return deny(res)
+    }
+  } catch (error) {
+    return res.cc(error)
+  }
+
   const sql0 = 'select department from users where id = ?'
   db.query(sql0, id, (err, result) => {
     if (err) return res.cc(err)
@@ -268,6 +338,7 @@ exports.changeIdentityToUser = (req, res) => {
   const sql = 'update users set identity = ? where id = ?'
   db.query(sql, [identity, req.body.id], (err) => {
     if (err) return res.cc(err)
+    replaceUserRoles(req.body.id, [getRoleCodeByIdentity(identity)]).catch(() => {})
     res.send({
       status: 0,
       message: '降级成功',
@@ -281,6 +352,7 @@ exports.changeIdentityToAdmin = (req, res) => {
   const sql = 'update users set identity = ?,update_time = ? where id = ?'
   db.query(sql, [req.body.identity, date, req.body.id], (err) => {
     if (err) return res.cc(err)
+    replaceUserRoles(req.body.id, [getRoleCodeByIdentity(req.body.identity)]).catch(() => {})
     res.send({
       status: 0,
       message: '赋权成功',
@@ -291,6 +363,10 @@ exports.changeIdentityToAdmin = (req, res) => {
 // 查询接口按账号、身份和部门拆开，页面可以按不同筛选条件单独调用。
 exports.searchUser = (req, res) => {
   const { account, identity } = req.body
+  if (!canReadIdentity(req, identity)) {
+    return deny(res)
+  }
+
   const sql = 'select * from users where account = ? and identity = ?'
   db.query(sql, [account, identity], (err, result) => {
     if (err) return res.cc(err)
@@ -357,6 +433,7 @@ exports.deleteUser = (req, res) => {
     const sql1 = 'delete from image where account = ?'
     db.query(sql1, req.body.account, (error) => {
       if (error) return res.cc(error)
+      db.query('delete from sys_user_roles where user_id = ?', req.body.id, () => {})
       res.send({
         status: 0,
         message: '删除用户成功',
@@ -367,16 +444,24 @@ exports.deleteUser = (req, res) => {
 
 // 列表总数和分页数据分开返回，方便前端分页组件复用。
 exports.getAdminListLength = (req, res) => {
-  const sql = 'select * from users where identity = ? '
+  if (!canReadIdentity(req, req.body.identity)) {
+    return deny(res)
+  }
+
+  const sql = 'select count(*) as total from users where identity = ? '
   db.query(sql, req.body.identity, (err, result) => {
     if (err) return res.cc(err)
     res.send({
-      length: result.length,
+      length: result[0].total,
     })
   })
 }
 
 exports.returnListData = (req, res) => {
+  if (!canReadIdentity(req, req.body.identity)) {
+    return deny(res)
+  }
+
   const number = (req.body.pager - 1) * 10
   const sql = `select * from users where identity = ? ORDER BY create_time limit 10 offset ${number} `
   db.query(sql, req.body.identity, (err, result) => {

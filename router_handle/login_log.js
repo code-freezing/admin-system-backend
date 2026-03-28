@@ -1,3 +1,10 @@
+/**
+ * 模块说明：
+ * 1. 登录日志业务处理层。
+ * 2. 负责写入和查询登录日志，支持分页和条件搜索。
+ * 3. 管理员通过它回溯账号登录历史。
+ */
+
 const db = require('../db/index')
 
 // 写入一条登录日志。
@@ -24,7 +31,7 @@ exports.loginLogList = (req, res) => {
 
 // 根据账号搜索最近 10 条登录记录。
 exports.searchLoginLogList = (req, res) => {
-  const sql = 'select * from login_log where account = ? ORDER BY login_time limit 10'
+  const sql = 'select * from login_log where account = ? ORDER BY login_time desc limit 10'
   db.query(sql, req.body.account, (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
@@ -33,11 +40,11 @@ exports.searchLoginLogList = (req, res) => {
 
 // 获取登录日志总数。
 exports.loginLogListLength = (req, res) => {
-  const sql = 'select * from login_log'
+  const sql = 'select count(*) as total from login_log'
   db.query(sql, (err, result) => {
     if (err) return res.cc(err)
     res.send({
-      length: result.length,
+      length: result[0].total,
     })
   })
 }

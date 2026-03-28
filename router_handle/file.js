@@ -1,3 +1,10 @@
+/**
+ * 模块说明：
+ * 1. 文件管理业务处理层。
+ * 2. 处理文件上传、删除、查询和列表返回等合同管理能力。
+ * 3. 同时负责与 public/upload 目录中的真实文件对应起来。
+ */
+
 const db = require('../db/index')
 const fs = require('fs')
 
@@ -85,11 +92,11 @@ exports.fileList = (req, res) => {
 
 // 获取文件总数。
 exports.fileListLength = (req, res) => {
-  const sql = 'select * from files '
+  const sql = 'select count(*) as total from files'
   db.query(sql, (err, result) => {
     if (err) return res.cc(err)
     res.send({
-      length: result.length,
+      length: result[0].total,
     })
   })
 }

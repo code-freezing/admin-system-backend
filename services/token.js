@@ -1,3 +1,10 @@
+/**
+ * 模块说明：
+ * 1. token 服务。
+ * 2. 负责签发 access token / refresh token、校验 refresh token 和执行 token 轮换。
+ * 3. 登录、刷新和退出登录都会通过这里完成底层认证操作。
+ */
+
 const jwt = require('jsonwebtoken')
 const jwtconfig = require('../jwt_config')
 const { getRefreshToken, revokeRefreshToken, saveRefreshToken } = require('./refresh_token_store')

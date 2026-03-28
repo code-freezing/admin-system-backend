@@ -1,3 +1,10 @@
+/**
+ * 模块说明：
+ * 1. 后端应用入口。
+ * 2. 负责组装中间件、静态资源、JWT 鉴权、路由挂载和统一异常处理。
+ * 3. 前端所有接口最终都会从这里进入对应业务模块。
+ */
+
 const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
@@ -6,6 +13,8 @@ const Joi = require('joi')
 const { expressjwt: jwt } = require('express-jwt')
 
 const jwtconfig = require('./jwt_config/index.js')
+const { loadAccessContext } = require('./middleware/access')
+const { bootstrapRbac } = require('./services/rbac_bootstrap')
 
 const loginRouter = require('./router/login')
 const userRouter = require('./router/userinfo.js')
@@ -72,15 +81,25 @@ app.use((req, res, next) => {
 })
 
 // JWT 中间件只校验 access token。
-// /api 下的认证接口、找回密码接口不需要先登录，所以要放行。
+// 只有登录、注册、刷新、退出以及找回密码接口不需要 access token。
 app.use(
   jwt({
     secret: jwtconfig.accessTokenSecretKey,
     algorithms: ['HS256'],
   }).unless({
-    path: [/^\/api\//, /^\/user\/verifyAccountAndEmail$/, /^\/user\/changePasswordInLogin$/],
+    path: [
+      '/api/register',
+      '/api/login',
+      '/api/refresh',
+      '/api/logout',
+      '/user/verifyAccountAndEmail',
+      '/user/changePasswordInLogin',
+    ],
   })
 )
+
+// JWT 通过后，把用户角色、权限码和可见菜单装到请求上下文里。
+app.use(loadAccessContext)
 
 // 这里把不同业务模块挂到不同的路径前缀，便于按模块拆分文件。
 app.use('/api', loginRouter)
@@ -95,7 +114,7 @@ app.use('/ov', overviewLogRouter)
 app.use('/dm', depMsgRouter)
 
 // 统一兜底处理参数校验错误、JWT 鉴权错误和未捕获异常。
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
   if (err instanceof Joi.ValidationError) {
     return res.status(400).send({
       status: 1,
@@ -116,6 +135,13 @@ app.use((err, req, res, next) => {
   })
 })
 
-app.listen(3007, () => {
-  console.log('http://127.0.0.1:3007')
-})
+bootstrapRbac()
+  .then(() => {
+    app.listen(3007, () => {
+      console.log('http://127.0.0.1:3007')
+    })
+  })
+  .catch((error) => {
+    console.error('RBAC 初始化失败：', error)
+    process.exit(1)
+  })
