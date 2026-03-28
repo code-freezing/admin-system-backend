@@ -42,7 +42,10 @@ const getRoleIdsByCodes = async (roleCodes) => {
   }
 
   const placeholders = roleCodes.map(() => '?').join(',')
-  const rows = await query(`select id, code from sys_roles where code in (${placeholders})`, roleCodes)
+  const rows = await query(
+    `select id, code from sys_roles where code in (${placeholders})`,
+    roleCodes
+  )
   return rows
 }
 
@@ -62,7 +65,9 @@ const replaceUserRoles = async (userId, roleCodes) => {
 }
 
 const ensureUserRoleAssignment = async (user) => {
-  const countRows = await query('select count(*) as count from sys_user_roles where user_id = ?', [user.id])
+  const countRows = await query('select count(*) as count from sys_user_roles where user_id = ?', [
+    user.id,
+  ])
   if (Number(countRows[0]?.count || 0) > 0) {
     return
   }

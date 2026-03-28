@@ -154,7 +154,9 @@ const getReadyFileRecordById = async (id) => {
 }
 
 const getFileObjectByHash = async (contentHash) => {
-  const rows = await query('select * from file_objects where content_hash = ? limit 1', [contentHash])
+  const rows = await query('select * from file_objects where content_hash = ? limit 1', [
+    contentHash,
+  ])
   return rows[0] || null
 }
 
@@ -255,7 +257,9 @@ const createUploadSession = async (payload) => {
 }
 
 const getSessionByUploadId = async (uploadId) => {
-  const rows = await query('select * from file_upload_sessions where upload_id = ? limit 1', [uploadId])
+  const rows = await query('select * from file_upload_sessions where upload_id = ? limit 1', [
+    uploadId,
+  ])
   return rows[0] || null
 }
 
@@ -428,7 +432,12 @@ exports.initMultipartUpload = async (req, res) => {
     const objectAbsolutePath = toAbsolutePath(existingObject?.storage_path)
 
     if (existingObject && (await exists(objectAbsolutePath))) {
-      const fileRecord = await createFileRecordFromObject(req, existingObject, payload.fileName, uploadPerson)
+      const fileRecord = await createFileRecordFromObject(
+        req,
+        existingObject,
+        payload.fileName,
+        uploadPerson
+      )
       return res.send({
         status: 0,
         uploadId: '',
@@ -466,7 +475,13 @@ exports.uploadChunk = async (req, res) => {
     const chunkIndex = Number(req.body.chunkIndex)
     const chunkFile = req.files?.[0]
 
-    if (!uploadId || !contentHash || !Number.isInteger(chunkIndex) || chunkIndex < 0 || !chunkFile) {
+    if (
+      !uploadId ||
+      !contentHash ||
+      !Number.isInteger(chunkIndex) ||
+      chunkIndex < 0 ||
+      !chunkFile
+    ) {
       return res.send({
         status: 1,
         message: '分片参数不完整',
@@ -548,7 +563,7 @@ exports.completeMultipartUpload = async (req, res) => {
       req,
       fileObject,
       session.file_name,
-      getCurrentUserName(req),
+      getCurrentUserName(req)
     )
 
     await markSessionStatus(uploadId, 'completed')

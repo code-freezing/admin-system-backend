@@ -52,13 +52,13 @@ exports.getCategoryAndNumber = async (req, res) => {
           select product_category, coalesce(sum(product_all_price), 0) as total_price
           from product
           group by product_category
-        `,
+        `
       ),
     ])
 
     const category = parseCategoryConfig(settingRows[0]?.set_value)
     const priceMap = new Map(
-      categoryRows.map((item) => [item.product_category, Number(item.total_price || 0)]),
+      categoryRows.map((item) => [item.product_category, Number(item.total_price || 0)])
     )
 
     res.send({
@@ -77,7 +77,7 @@ exports.getAdminAndNumber = async (req, res) => {
         select identity, count(*) as total
         from users
         group by identity
-      `,
+      `
     )
 
     const countMap = new Map(rows.map((item) => [item.identity, Number(item.total || 0)]))
@@ -100,7 +100,7 @@ exports.getLevelAndNumber = async (req, res) => {
         from message
         where message_status = 0
         group by message_level
-      `,
+      `
     )
 
     const countMap = new Map(rows.map((item) => [item.message_level, Number(item.total || 0)]))
@@ -132,14 +132,17 @@ exports.getDayAndNumber = async (req, res) => {
         where login_time >= date_sub(curdate(), interval 6 day)
         group by date(login_time)
         order by login_day asc
-      `,
+      `
     )
 
     const countMap = new Map(
       rows.map((item) => {
-        const key = item.login_day instanceof Date ? item.login_day.toISOString().slice(0, 10) : item.login_day
+        const key =
+          item.login_day instanceof Date
+            ? item.login_day.toISOString().slice(0, 10)
+            : item.login_day
         return [key, Number(item.total || 0)]
-      }),
+      })
     )
 
     const week = Array.from({ length: 7 }, (_, index) => {

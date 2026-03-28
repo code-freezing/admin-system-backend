@@ -55,7 +55,9 @@ const OUT_PRODUCT_COLUMNS = `
 // 3. views/product/components/audit.vue
 
 const isEmployee = (req) => {
-  return Array.isArray(req.accessContext?.roles) && req.accessContext.roles.includes(ROLE_CODES.EMPLOYEE)
+  return (
+    Array.isArray(req.accessContext?.roles) && req.accessContext.roles.includes(ROLE_CODES.EMPLOYEE)
+  )
 }
 
 const deny = (res) => {
@@ -67,14 +69,18 @@ const deny = (res) => {
 
 const getProductRowById = (id) => {
   return new Promise((resolve, reject) => {
-    db.query('select * from product where id = ? limit 1', [id], (err, results) => {
-      if (err) {
-        reject(err)
-        return
-      }
+    db.query(
+      `select ${PRODUCT_COLUMNS} from product where id = ? limit 1`,
+      [id],
+      (err, results) => {
+        if (err) {
+          reject(err)
+          return
+        }
 
-      resolve(results[0] || null)
-    })
+        resolve(results[0] || null)
+      }
+    )
   })
 }
 
@@ -92,7 +98,7 @@ exports.createProduct = (req, res) => {
   } = req.body
   const product_create_time = new Date()
   const product_all_price = product_in_warehouse_number * 1 * product_single_price
-  const sql0 = 'select * from product where product_id = ?'
+  const sql0 = 'select id from product where product_id = ? limit 1'
   db.query(sql0, product_id, (err, results) => {
     if (err) return res.cc(err)
     if (results.length > 0) {
@@ -195,19 +201,14 @@ exports.getProductList = (req, res) => {
 // 出库申请先占用申请字段，真正扣减库存要等审核同意后才发生。
 exports.applyOutProduct = (req, res) => {
   const product_out_status = '申请出库'
-  const {
-    id,
-    product_out_id,
-    product_single_price,
-    product_out_number,
-    apply_memo,
-  } = req.body
-  const product_out_apply_person = req.accessContext?.user?.name || req.body.product_out_apply_person
+  const { id, product_out_id, product_single_price, product_out_number, apply_memo } = req.body
+  const product_out_apply_person =
+    req.accessContext?.user?.name || req.body.product_out_apply_person
   const product_out_apply_user_id = req.accessContext?.user?.id || null
   const product_out_apply_account = req.accessContext?.user?.account || null
   const product_apply_time = new Date()
   const product_out_price = product_out_number * 1 * product_single_price
-  const sql0 = 'select * from product where product_out_id = ?'
+  const sql0 = 'select id from product where product_out_id = ? limit 1'
   db.query(sql0, product_out_id, (err, result) => {
     if (err) return res.cc(err)
     if (result.length > 0) {
@@ -319,18 +320,18 @@ exports.auditProduct = (req, res) => {
     const sql = 'insert into outproduct set ?'
     db.query(
       sql,
-        {
-          product_out_id,
-          product_out_number,
-          product_out_price,
-          product_out_audit_person,
-          product_out_apply_person,
-          product_out_apply_user_id,
-          product_out_apply_account,
-          product_audit_time,
-          product_apply_time,
-          audit_memo,
-        },
+      {
+        product_out_id,
+        product_out_number,
+        product_out_price,
+        product_out_audit_person,
+        product_out_apply_person,
+        product_out_apply_user_id,
+        product_out_apply_account,
+        product_audit_time,
+        product_apply_time,
+        audit_memo,
+      },
       (err) => {
         if (err) return res.cc(err)
         const sql1 =

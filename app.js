@@ -68,7 +68,7 @@ app.use(
     etag: true,
     lastModified: true,
     maxAge: '1d',
-  }),
+  })
 )
 
 // refresh token 放在 HttpOnly Cookie 里，进入业务前先把 Cookie 解析出来。

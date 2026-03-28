@@ -28,7 +28,7 @@ const ensureIndex = async (tableName, indexName, columnSql) => {
         and table_name = ?
         and index_name = ?
     `,
-    [tableName, indexName],
+    [tableName, indexName]
   )
 
   if (Number(rows[0]?.count || 0) > 0) {
@@ -47,13 +47,9 @@ const bootstrapPerformance = async () => {
   await ensureIndex(
     'message',
     'idx_message_status_category_publish_time',
-    '(message_status, message_category, message_publish_time)',
+    '(message_status, message_category, message_publish_time)'
   )
-  await ensureIndex(
-    'message',
-    'idx_message_publish_department',
-    '(message_publish_department)',
-  )
+  await ensureIndex('message', 'idx_message_publish_department', '(message_publish_department)')
   await ensureIndex('message', 'idx_message_level', '(message_level)')
 
   await ensureIndex('product', 'idx_product_create_time', '(product_create_time)')

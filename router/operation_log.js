@@ -12,10 +12,30 @@ const { requirePermission } = require('../middleware/access')
 
 // 操作日志接口：写入日志、分页查询、筛选和清空。
 router.post('/operationLog', operationLogHandler.operationLog)
-router.post('/operationLogList', requirePermission('api.log.operation.read'), operationLogHandler.operationLogList)
-router.post('/searchOperationLogList', requirePermission('api.log.operation.read'), operationLogHandler.searchOperationLogList)
-router.post('/operationLogListLength', requirePermission('api.log.operation.read'), operationLogHandler.operationLogListLength)
-router.post('/returnOperationListData', requirePermission('api.log.operation.read'), operationLogHandler.returnOperationListData)
-router.post('/clearOperationLogList', requirePermission('api.log.operation.clear'), operationLogHandler.clearOperationLogList)
+router.post(
+  '/operationLogList',
+  requirePermission('api.log.operation.read'),
+  operationLogHandler.operationLogList
+)
+router.post(
+  '/searchOperationLogList',
+  requirePermission('api.log.operation.read'),
+  operationLogHandler.searchOperationLogList
+)
+router.post(
+  '/operationLogListLength',
+  requirePermission('api.log.operation.read'),
+  operationLogHandler.operationLogListLength
+)
+router.post(
+  '/returnOperationListData',
+  requirePermission('api.log.operation.read'),
+  operationLogHandler.returnOperationListData
+)
+router.post(
+  '/clearOperationLogList',
+  requirePermission('api.log.operation.clear'),
+  operationLogHandler.clearOperationLogList
+)
 
 module.exports = router

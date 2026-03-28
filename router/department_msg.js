@@ -17,7 +17,15 @@ router.post('/getDepartmentMsg', departmentMessageHandler.getDepartmentMsg)
 router.post('/getDepartmentMsgList', departmentMessageHandler.getDepartmentMsgList)
 router.post('/getReadListAndStatus', departmentMessageHandler.getReadListAndStatus)
 router.post('/clickDelete', departmentMessageHandler.clickDelete)
-router.post('/changeUserReadList', requirePermission('api.message.publish'), departmentMessageHandler.changeUserReadList)
-router.post('/changeUserReadListButDelete', requirePermission('api.message.edit'), departmentMessageHandler.changeUserReadListButDelete)
+router.post(
+  '/changeUserReadList',
+  requirePermission('api.message.publish'),
+  departmentMessageHandler.changeUserReadList
+)
+router.post(
+  '/changeUserReadListButDelete',
+  requirePermission('api.message.edit'),
+  departmentMessageHandler.changeUserReadListButDelete
+)
 
 module.exports = router

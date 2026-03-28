@@ -11,9 +11,25 @@ const overviewHandler = require('../router_handle/overview.js')
 const { requirePermission } = require('../middleware/access')
 
 // 概览页统计接口，直接服务首页图表。
-router.post('/getCategoryAndNumber', requirePermission('api.overview.read'), overviewHandler.getCategoryAndNumber)
-router.post('/getAdminAndNumber', requirePermission('api.overview.read'), overviewHandler.getAdminAndNumber)
-router.post('/getLevelAndNumber', requirePermission('api.overview.read'), overviewHandler.getLevelAndNumber)
-router.post('/getDayAndNumber', requirePermission('api.overview.read'), overviewHandler.getDayAndNumber)
+router.post(
+  '/getCategoryAndNumber',
+  requirePermission('api.overview.read'),
+  overviewHandler.getCategoryAndNumber
+)
+router.post(
+  '/getAdminAndNumber',
+  requirePermission('api.overview.read'),
+  overviewHandler.getAdminAndNumber
+)
+router.post(
+  '/getLevelAndNumber',
+  requirePermission('api.overview.read'),
+  overviewHandler.getLevelAndNumber
+)
+router.post(
+  '/getDayAndNumber',
+  requirePermission('api.overview.read'),
+  overviewHandler.getDayAndNumber
+)
 
 module.exports = router

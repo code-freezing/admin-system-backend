@@ -18,24 +18,76 @@ const { requireAnyPermission, requirePermission } = require('../middleware/acces
 router.post('/createProduct', requirePermission('api.product.create'), productHandler.createProduct)
 router.post('/deleteProduct', requirePermission('api.product.delete'), productHandler.deleteProduct)
 router.post('/editProduct', requirePermission('api.product.edit'), productHandler.editProduct)
-router.post('/getProductList', requirePermission('api.product.inventory.read'), productHandler.getProductList)
+router.post(
+  '/getProductList',
+  requirePermission('api.product.inventory.read'),
+  productHandler.getProductList
+)
 router.post(
   '/applyOutProduct',
   requireAnyPermission(['api.product.apply', 'api.product.reapply']),
   productHandler.applyOutProduct
 )
-router.post('/applyProductList', requirePermission('api.product.outbound.read'), productHandler.applyProductList)
-router.post('/withdrawApplyProduct', requirePermission('api.product.withdraw'), productHandler.withdrawApplyProduct)
+router.post(
+  '/applyProductList',
+  requirePermission('api.product.outbound.read'),
+  productHandler.applyProductList
+)
+router.post(
+  '/withdrawApplyProduct',
+  requirePermission('api.product.withdraw'),
+  productHandler.withdrawApplyProduct
+)
 router.post('/auditProduct', requirePermission('api.product.audit'), productHandler.auditProduct)
-router.post('/searchProductForId', requirePermission('api.product.inventory.read'), productHandler.searchProductForId)
-router.post('/searchProductForApplyId', requirePermission('api.product.outbound.read'), productHandler.searchProductForApplyId)
-router.post('/searchProductForOutId', requirePermission('api.product.history.read'), productHandler.searchProductForOutId)
-router.post('/getProductLength', requirePermission('api.product.inventory.read'), productHandler.getProductLength)
-router.post('/getApplyProductLength', requirePermission('api.product.outbound.read'), productHandler.getApplyProductLength)
-router.post('/auditProductList', requirePermission('api.product.history.read'), productHandler.auditProductList)
-router.post('/getOutProductLength', requirePermission('api.product.history.read'), productHandler.getOutProductLength)
-router.post('/returnProductListData', requirePermission('api.product.inventory.read'), productHandler.returnProductListData)
-router.post('/returnApplyProductListData', requirePermission('api.product.outbound.read'), productHandler.returnApplyProductListData)
-router.post('/returnOutProductListData', requirePermission('api.product.history.read'), productHandler.returnOutProductListData)
+router.post(
+  '/searchProductForId',
+  requirePermission('api.product.inventory.read'),
+  productHandler.searchProductForId
+)
+router.post(
+  '/searchProductForApplyId',
+  requirePermission('api.product.outbound.read'),
+  productHandler.searchProductForApplyId
+)
+router.post(
+  '/searchProductForOutId',
+  requirePermission('api.product.history.read'),
+  productHandler.searchProductForOutId
+)
+router.post(
+  '/getProductLength',
+  requirePermission('api.product.inventory.read'),
+  productHandler.getProductLength
+)
+router.post(
+  '/getApplyProductLength',
+  requirePermission('api.product.outbound.read'),
+  productHandler.getApplyProductLength
+)
+router.post(
+  '/auditProductList',
+  requirePermission('api.product.history.read'),
+  productHandler.auditProductList
+)
+router.post(
+  '/getOutProductLength',
+  requirePermission('api.product.history.read'),
+  productHandler.getOutProductLength
+)
+router.post(
+  '/returnProductListData',
+  requirePermission('api.product.inventory.read'),
+  productHandler.returnProductListData
+)
+router.post(
+  '/returnApplyProductListData',
+  requirePermission('api.product.outbound.read'),
+  productHandler.returnApplyProductListData
+)
+router.post(
+  '/returnOutProductListData',
+  requirePermission('api.product.history.read'),
+  productHandler.returnOutProductListData
+)
 
 module.exports = router

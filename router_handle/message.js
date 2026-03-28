@@ -340,7 +340,8 @@ exports.deleteMessage = (req, res) => {
 // 公司公告和系统消息共用同一张表，只靠 message_category 区分。
 exports.getCompanyMessageLength = (req, res) => {
   // 对应后台“公司消息”标签页分页器总数。
-  const sql = 'select count(*) as total from message where message_category ="公司公告" and message_status = 0'
+  const sql =
+    'select count(*) as total from message where message_category ="公司公告" and message_status = 0'
   db.query(sql, (err, result) => {
     if (err) return res.cc(err)
     res.send({
@@ -351,7 +352,8 @@ exports.getCompanyMessageLength = (req, res) => {
 
 exports.getSystemMessageLength = (req, res) => {
   // 对应后台“系统消息”标签页分页器总数。
-  const sql = 'select count(*) as total from message where message_category ="系统消息" and message_status = 0'
+  const sql =
+    'select count(*) as total from message where message_category ="系统消息" and message_status = 0'
   db.query(sql, (err, result) => {
     if (err) return res.cc(err)
     res.send({

@@ -30,6 +30,22 @@ const USER_SAFE_COLUMNS = `
   read_status,
   read_list
 `
+const USER_AUTH_COLUMNS = `
+  id,
+  account,
+  password,
+  name,
+  sex,
+  department,
+  email,
+  identity,
+  image_url,
+  create_time,
+  update_time,
+  status,
+  read_status,
+  read_list
+`
 
 // 用户信息模块同时承载个人资料、找回密码和后台用户管理等能力。
 // 这里的大多数接口直接操作 users 表，少量会联动 image 表中的头像记录。
@@ -133,15 +149,24 @@ exports.changePassword = (req, res) => {
 exports.getUserInfo = (req, res) => {
   const currentUserId = req.accessContext?.user?.id
   const targetUserId = Number(req.body.id)
-  const canReadOthers = hasAnyPermission(req.accessContext, ['api.user.user.read', 'api.user.admin.read'])
+  const canReadOthers = hasAnyPermission(req.accessContext, [
+    'api.user.user.read',
+    'api.user.admin.read',
+  ])
 
   if (currentUserId !== targetUserId && !canReadOthers) {
     return deny(res)
   }
 
-  const sql = 'select * from users where id = ?'
+  const sql = `select ${USER_AUTH_COLUMNS} from users where id = ? limit 1`
   db.query(sql, req.body.id, (err, result) => {
     if (err) return res.cc(err)
+    if (result.length !== 1) {
+      return res.send({
+        status: 1,
+        message: '用户不存在',
+      })
+    }
     result[0].password = ''
     res.send(result[0])
   })
@@ -187,9 +212,15 @@ exports.changeEmail = (req, res) => {
 // 登录页找回密码前，先校验账号和邮箱是否匹配。
 exports.verifyAccountAndEmail = (req, res) => {
   const { account, email } = req.body
-  const sql = 'select * from users where account = ?'
+  const sql = 'select id, email from users where account = ? limit 1'
   db.query(sql, account, (err, result) => {
     if (err) return res.cc(err)
+    if (result.length !== 1) {
+      return res.send({
+        status: 1,
+        message: '查询失败',
+      })
+    }
     if (email == result[0].email) {
       res.send({
         status: 0,
@@ -222,7 +253,7 @@ exports.changePasswordInLogin = (req, res) => {
 // 后台用户管理从这里开始，支持创建管理员和后续权限调整。
 exports.createAdmin = (req, res) => {
   const { account, password, name, sex, department, email, identity } = req.body
-  const sql = 'select * from users where account = ?'
+  const sql = 'select id from users where account = ? limit 1'
   db.query(sql, account, (err, results) => {
     if (err) return res.cc(err)
     if (results.length > 0) {

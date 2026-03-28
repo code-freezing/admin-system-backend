@@ -8,6 +8,7 @@
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
+const { URL } = require('url')
 const db = require('../db')
 
 const PROJECT_ROOT = path.resolve(__dirname, '..')
@@ -238,13 +239,7 @@ const migrateLegacyFiles = async () => {
             file_url = ?
         where id = ?
       `,
-      [
-        objectId,
-        contentHash,
-        finalStoragePath,
-        buildFileUrl(finalStoragePath),
-        row.id,
-      ]
+      [objectId, contentHash, finalStoragePath, buildFileUrl(finalStoragePath), row.id]
     )
   }
 }
@@ -335,7 +330,11 @@ const bootstrapFileUpload = async () => {
   await ensureColumn('files', 'object_id', 'object_id int null after id')
   await ensureColumn('files', 'content_hash', 'content_hash varchar(64) null after object_id')
   await ensureColumn('files', 'storage_path', 'storage_path varchar(255) null after content_hash')
-  await ensureColumn('files', 'status', `status varchar(16) not null default 'ready' after storage_path`)
+  await ensureColumn(
+    'files',
+    'status',
+    `status varchar(16) not null default 'ready' after storage_path`
+  )
 
   await migrateLegacyFiles()
   await syncObjectRefCounts()

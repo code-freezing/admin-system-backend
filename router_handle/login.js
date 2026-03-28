@@ -17,6 +17,22 @@ const {
 const { getRoleCodeByIdentity, replaceUserRoles } = require('../services/access_control')
 
 const REFRESH_COOKIE_NAME = 'refreshToken'
+const AUTH_USER_COLUMNS = `
+  id,
+  account,
+  password,
+  name,
+  sex,
+  department,
+  email,
+  identity,
+  image_url,
+  create_time,
+  update_time,
+  status,
+  read_status,
+  read_list
+`
 
 // 这个文件既处理账号登录，也负责双 token 的刷新与注销。
 const query = (sql, values = []) =>
@@ -70,9 +86,11 @@ const clearRefreshTokenCookie = (res) => {
 }
 
 // 这两个查询函数单独抽出，是为了让登录、刷新 token 等流程复用同一套取数方式。
-const findUserByAccount = (account) => query('select * from users where account = ?', [account])
+const findUserByAccount = (account) =>
+  query(`select ${AUTH_USER_COLUMNS} from users where account = ? limit 1`, [account])
 
-const findUserById = (id) => query('select * from users where id = ?', [id])
+const findUserById = (id) =>
+  query(`select ${AUTH_USER_COLUMNS} from users where id = ? limit 1`, [id])
 
 exports.register = async (req, res) => {
   const regInfo = req.body
@@ -85,7 +103,7 @@ exports.register = async (req, res) => {
   }
 
   try {
-    const results = await query('select * from users where account = ?', [regInfo.account])
+    const results = await query('select id from users where account = ? limit 1', [regInfo.account])
 
     if (results.length > 0) {
       return res.send({

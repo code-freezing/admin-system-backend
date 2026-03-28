@@ -40,15 +40,39 @@ router.post(
   requireAnyPermission(['api.user.admin.edit', 'api.user.user.edit']),
   userHandler.editAdmin
 )
-router.post('/changeIdentityToUser', requirePermission('api.user.admin.demote'), userHandler.changeIdentityToUser)
-router.post('/changeIdentityToAdmin', requirePermission('api.user.user.promote'), userHandler.changeIdentityToAdmin)
-router.post('/searchUser', requireAnyPermission(['api.user.admin.read', 'api.user.user.read']), userHandler.searchUser)
-router.post('/searchUserByDepartment', requirePermission('api.user.user.read'), userHandler.searchUserByDepartment)
+router.post(
+  '/changeIdentityToUser',
+  requirePermission('api.user.admin.demote'),
+  userHandler.changeIdentityToUser
+)
+router.post(
+  '/changeIdentityToAdmin',
+  requirePermission('api.user.user.promote'),
+  userHandler.changeIdentityToAdmin
+)
+router.post(
+  '/searchUser',
+  requireAnyPermission(['api.user.admin.read', 'api.user.user.read']),
+  userHandler.searchUser
+)
+router.post(
+  '/searchUserByDepartment',
+  requirePermission('api.user.user.read'),
+  userHandler.searchUserByDepartment
+)
 router.post('/banUser', requirePermission('api.user.user.ban'), userHandler.banUser)
 router.post('/hotUser', requirePermission('api.user.user.unban'), userHandler.hotUser)
 router.post('/getBanList', requirePermission('api.user.user.read'), userHandler.getBanList)
 router.post('/deleteUser', requirePermission('api.user.user.delete'), userHandler.deleteUser)
-router.post('/getAdminListLength', requireAnyPermission(['api.user.admin.read', 'api.user.user.read']), userHandler.getAdminListLength)
-router.post('/returnListData', requireAnyPermission(['api.user.admin.read', 'api.user.user.read']), userHandler.returnListData)
+router.post(
+  '/getAdminListLength',
+  requireAnyPermission(['api.user.admin.read', 'api.user.user.read']),
+  userHandler.getAdminListLength
+)
+router.post(
+  '/returnListData',
+  requireAnyPermission(['api.user.admin.read', 'api.user.user.read']),
+  userHandler.returnListData
+)
 
 module.exports = router

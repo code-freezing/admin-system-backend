@@ -5,7 +5,11 @@
  * 3. 业务 handler 只需要处理资源级补充校验。
  */
 
-const { buildAccessContext, hasAnyPermission, hasPermission } = require('../services/access_control')
+const {
+  buildAccessContext,
+  hasAnyPermission,
+  hasPermission,
+} = require('../services/access_control')
 
 const deny = (res) => {
   return res.status(403).send({

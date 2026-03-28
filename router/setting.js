@@ -16,16 +16,36 @@ const { requirePermission } = require('../middleware/access')
 // 2. 公司设置：首页文案相关接口
 // 3. 首页管理：uploadSwiper/getAllSwiper
 // 4. 字典维护：setDepartment/getDepartment/setProduct/getProduct
-router.post('/uploadSwiper', requirePermission('api.setting.write.swiper'), settingHandler.uploadSwiper)
+router.post(
+  '/uploadSwiper',
+  requirePermission('api.setting.write.swiper'),
+  settingHandler.uploadSwiper
+)
 router.post('/getAllSwiper', settingHandler.getAllSwiper)
 router.post('/getCompanyName', settingHandler.getCompanyName)
-router.post('/changeCompanyName', requirePermission('api.setting.write.company'), settingHandler.changeCompanyName)
-router.post('/changeCompanyIntroduce', requirePermission('api.setting.write.company'), settingHandler.changeCompanyIntroduce)
+router.post(
+  '/changeCompanyName',
+  requirePermission('api.setting.write.company'),
+  settingHandler.changeCompanyName
+)
+router.post(
+  '/changeCompanyIntroduce',
+  requirePermission('api.setting.write.company'),
+  settingHandler.changeCompanyIntroduce
+)
 router.post('/getCompanyIntroduce', settingHandler.getCompanyIntroduce)
 router.post('/getAllCompanyIntroduce', settingHandler.getAllCompanyIntroduce)
-router.post('/setDepartment', requirePermission('api.setting.write.dictionary'), settingHandler.setDepartment)
+router.post(
+  '/setDepartment',
+  requirePermission('api.setting.write.dictionary'),
+  settingHandler.setDepartment
+)
 router.post('/getDepartment', settingHandler.getDepartment)
-router.post('/setProduct', requirePermission('api.setting.write.dictionary'), settingHandler.setProduct)
+router.post(
+  '/setProduct',
+  requirePermission('api.setting.write.dictionary'),
+  settingHandler.setProduct
+)
 router.post('/getProduct', settingHandler.getProduct)
 
 module.exports = router
