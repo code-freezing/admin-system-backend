@@ -7,6 +7,45 @@
 
 const db = require('../db/index')
 const { ROLE_CODES } = require('../services/access_control')
+const PRODUCT_COLUMNS = `
+  id,
+  product_id,
+  product_name,
+  product_category,
+  product_unit,
+  product_in_warehouse_number,
+  product_single_price,
+  product_all_price,
+  product_create_person,
+  product_create_time,
+  product_update_time,
+  in_memo,
+  product_out_status,
+  product_out_id,
+  product_out_number,
+  product_out_price,
+  product_out_apply_person,
+  product_out_apply_user_id,
+  product_out_apply_account,
+  apply_memo,
+  audit_memo,
+  product_apply_time,
+  product_audit_time,
+  product_out_audit_person
+`
+const OUT_PRODUCT_COLUMNS = `
+  id,
+  product_out_id,
+  product_out_number,
+  product_out_price,
+  product_out_audit_person,
+  product_out_apply_person,
+  product_out_apply_user_id,
+  product_out_apply_account,
+  product_audit_time,
+  product_apply_time,
+  audit_memo
+`
 
 // 产品模块覆盖入库、出库申请、审核和出库记录查询。
 // 这里的数据主表是 product，审核通过后的历史记录会落到 outproduct。
@@ -141,7 +180,12 @@ exports.editProduct = (req, res) => {
 
 // 库存列表以当前 product 表为准，数量为 0 的产品也仍然保留记录。
 exports.getProductList = (req, res) => {
-  const sql = 'select * from product where product_in_warehouse_number>= 0'
+  const sql = `
+    select ${PRODUCT_COLUMNS}
+    from product
+    where product_in_warehouse_number >= 0
+    order by product_create_time desc
+  `
   db.query(sql, (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
@@ -207,8 +251,8 @@ exports.applyProductList = (req, res) => {
   // 前端“出库管理”标签页展示的就是这批记录。
   // 已经审核同意并真正出库的记录会转到 outproduct，不再出现在这里。
   const sql = isEmployee(req)
-    ? 'select * from product where product_out_status not in ("同意") and product_out_apply_user_id = ?'
-    : 'select * from product where product_out_status not in ("同意")'
+    ? `select ${PRODUCT_COLUMNS} from product where product_out_status not in ('同意') and product_out_apply_user_id = ? order by product_apply_time desc`
+    : `select ${PRODUCT_COLUMNS} from product where product_out_status not in ('同意') order by product_apply_time desc`
   const values = isEmployee(req) ? [req.accessContext.user.id] : []
   db.query(sql, values, (err, result) => {
     if (err) return res.cc(err)
@@ -324,7 +368,7 @@ exports.auditProduct = (req, res) => {
 
 // 三个搜索接口分别对应入库编号、申请编号和出库记录编号。
 exports.searchProductForId = (req, res) => {
-  const sql = 'select * from product where product_id  = ?'
+  const sql = `select ${PRODUCT_COLUMNS} from product where product_id = ?`
   db.query(sql, req.body.product_id, (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
@@ -333,8 +377,8 @@ exports.searchProductForId = (req, res) => {
 
 exports.searchProductForApplyId = (req, res) => {
   const sql = isEmployee(req)
-    ? 'select * from product where product_out_id = ? and product_out_apply_user_id = ?'
-    : 'select * from product where product_out_id = ?'
+    ? `select ${PRODUCT_COLUMNS} from product where product_out_id = ? and product_out_apply_user_id = ?`
+    : `select ${PRODUCT_COLUMNS} from product where product_out_id = ?`
   const values = isEmployee(req)
     ? [req.body.product_out_id, req.accessContext.user.id]
     : [req.body.product_out_id]
@@ -346,8 +390,8 @@ exports.searchProductForApplyId = (req, res) => {
 
 exports.searchProductForOutId = (req, res) => {
   const sql = isEmployee(req)
-    ? 'select * from outproduct where product_out_id = ? and product_out_apply_user_id = ?'
-    : 'select * from outproduct where product_out_id = ?'
+    ? `select ${OUT_PRODUCT_COLUMNS} from outproduct where product_out_id = ? and product_out_apply_user_id = ?`
+    : `select ${OUT_PRODUCT_COLUMNS} from outproduct where product_out_id = ?`
   const values = isEmployee(req)
     ? [req.body.product_out_id, req.accessContext.user.id]
     : [req.body.product_out_id]
@@ -386,8 +430,8 @@ exports.getApplyProductLength = (req, res) => {
 exports.auditProductList = (req, res) => {
   // 这个列表对应的是已经完成的历史出库记录，而不是当前待审核申请。
   const sql = isEmployee(req)
-    ? 'select * from outproduct where product_out_apply_user_id = ?'
-    : 'select * from outproduct'
+    ? `select ${OUT_PRODUCT_COLUMNS} from outproduct where product_out_apply_user_id = ? order by product_audit_time desc`
+    : `select ${OUT_PRODUCT_COLUMNS} from outproduct order by product_audit_time desc`
   const values = isEmployee(req) ? [req.accessContext.user.id] : []
   db.query(sql, values, (err, result) => {
     if (err) return res.cc(err)
@@ -411,8 +455,14 @@ exports.getOutProductLength = (req, res) => {
 exports.returnProductListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   // 这里通过 offset 做最基础的分页，前端约定每页固定 10 条。
-  const sql = `select * from product where product_in_warehouse_number>= 0 ORDER BY product_create_time limit 10 offset ${number} `
-  db.query(sql, (err, result) => {
+  const sql = `
+    select ${PRODUCT_COLUMNS}
+    from product
+    where product_in_warehouse_number >= 0
+    order by product_create_time desc
+    limit 10 offset ?
+  `
+  db.query(sql, [number], (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
   })
@@ -423,10 +473,23 @@ exports.returnApplyProductListData = (req, res) => {
   // “申请出库”和“否决”两种状态都留在这里，
   // 因为前端要允许用户继续看到被驳回的记录并重新申请。
   const sql = isEmployee(req)
-    ? `select * from product where (product_out_status = "申请出库" || product_out_status = "否决") and product_out_apply_user_id = ? ORDER BY product_apply_time limit 10 offset ${number} `
-    : `select * from product where product_out_status = "申请出库" || product_out_status = "否决" ORDER BY product_apply_time limit 10 offset ${number} `
+    ? `
+        select ${PRODUCT_COLUMNS}
+        from product
+        where (product_out_status = '申请出库' or product_out_status = '否决')
+          and product_out_apply_user_id = ?
+        order by product_apply_time desc
+        limit 10 offset ?
+      `
+    : `
+        select ${PRODUCT_COLUMNS}
+        from product
+        where product_out_status = '申请出库' or product_out_status = '否决'
+        order by product_apply_time desc
+        limit 10 offset ?
+      `
   const values = isEmployee(req) ? [req.accessContext.user.id] : []
-  db.query(sql, values, (err, result) => {
+  db.query(sql, [...values, number], (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
   })
@@ -435,10 +498,21 @@ exports.returnApplyProductListData = (req, res) => {
 exports.returnOutProductListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = isEmployee(req)
-    ? `select * from outproduct where product_out_apply_user_id = ? ORDER BY product_audit_time limit 10 offset ${number} `
-    : `select * from outproduct ORDER BY product_audit_time limit 10 offset ${number} `
+    ? `
+        select ${OUT_PRODUCT_COLUMNS}
+        from outproduct
+        where product_out_apply_user_id = ?
+        order by product_audit_time desc
+        limit 10 offset ?
+      `
+    : `
+        select ${OUT_PRODUCT_COLUMNS}
+        from outproduct
+        order by product_audit_time desc
+        limit 10 offset ?
+      `
   const values = isEmployee(req) ? [req.accessContext.user.id] : []
-  db.query(sql, values, (err, result) => {
+  db.query(sql, [...values, number], (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
   })

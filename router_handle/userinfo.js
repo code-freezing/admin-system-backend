@@ -15,6 +15,21 @@ const {
   hasPermission,
   replaceUserRoles,
 } = require('../services/access_control')
+const USER_SAFE_COLUMNS = `
+  id,
+  account,
+  name,
+  sex,
+  department,
+  email,
+  identity,
+  image_url,
+  create_time,
+  update_time,
+  status,
+  read_status,
+  read_list
+`
 
 // 用户信息模块同时承载个人资料、找回密码和后台用户管理等能力。
 // 这里的大多数接口直接操作 users 表，少量会联动 image 表中的头像记录。
@@ -258,15 +273,14 @@ exports.getAdminList = (req, res) => {
     return deny(res)
   }
 
-  const sql = 'select * from users where identity = ?'
+  const sql = `
+    select ${USER_SAFE_COLUMNS}
+    from users
+    where identity = ?
+    order by create_time desc
+  `
   db.query(sql, req.body.identity, (err, result) => {
     if (err) return res.cc(err)
-    result.forEach((e) => {
-      e.password = ''
-      e.create_time = ''
-      e.image_url = ''
-      e.status = ''
-    })
     res.send(result)
   })
 }
@@ -367,27 +381,29 @@ exports.searchUser = (req, res) => {
     return deny(res)
   }
 
-  const sql = 'select * from users where account = ? and identity = ?'
+  const sql = `
+    select ${USER_SAFE_COLUMNS}
+    from users
+    where account = ?
+      and identity = ?
+    limit 10
+  `
   db.query(sql, [account, identity], (err, result) => {
     if (err) return res.cc(err)
-    result.forEach((e) => {
-      e.password = ''
-      e.create_time = ''
-      e.image_url = ''
-      e.status = ''
-    })
     res.send(result)
   })
 }
 
 exports.searchUserByDepartment = (req, res) => {
-  const sql = 'select * from users where department = ? and identity = "用户"'
+  const sql = `
+    select ${USER_SAFE_COLUMNS}
+    from users
+    where department = ?
+      and identity = '用户'
+    order by create_time desc
+  `
   db.query(sql, req.body.department, (err, result) => {
     if (err) return res.cc(err)
-    result.forEach((e) => {
-      e.password = ''
-      e.image_url = ''
-    })
     res.send(result)
   })
 }
@@ -418,7 +434,12 @@ exports.hotUser = (req, res) => {
 }
 
 exports.getBanList = (req, res) => {
-  const sql = 'select * from users where status = "1" '
+  const sql = `
+    select ${USER_SAFE_COLUMNS}
+    from users
+    where status = 1
+    order by update_time desc, create_time desc
+  `
   db.query(sql, (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
@@ -463,8 +484,14 @@ exports.returnListData = (req, res) => {
   }
 
   const number = (req.body.pager - 1) * 10
-  const sql = `select * from users where identity = ? ORDER BY create_time limit 10 offset ${number} `
-  db.query(sql, req.body.identity, (err, result) => {
+  const sql = `
+    select ${USER_SAFE_COLUMNS}
+    from users
+    where identity = ?
+    order by create_time desc
+    limit 10 offset ?
+  `
+  db.query(sql, [req.body.identity, number], (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
   })

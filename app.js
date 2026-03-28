@@ -14,6 +14,8 @@ const { expressjwt: jwt } = require('express-jwt')
 
 const jwtconfig = require('./jwt_config/index.js')
 const { loadAccessContext } = require('./middleware/access')
+const { bootstrapFileUpload } = require('./services/file_upload_bootstrap')
+const { bootstrapPerformance } = require('./services/performance_bootstrap')
 const { bootstrapRbac } = require('./services/rbac_bootstrap')
 
 const loginRouter = require('./router/login')
@@ -61,7 +63,13 @@ const upload = multer({ dest: './public/upload' })
 app.use(upload.any())
 
 // public 目录既存放上传文件，也直接对外提供静态访问。
-app.use(express.static('./public'))
+app.use(
+  express.static('./public', {
+    etag: true,
+    lastModified: true,
+    maxAge: '1d',
+  }),
+)
 
 // refresh token 放在 HttpOnly Cookie 里，进入业务前先把 Cookie 解析出来。
 app.use((req, res, next) => {
@@ -136,12 +144,14 @@ app.use((err, req, res) => {
 })
 
 bootstrapRbac()
+  .then(() => bootstrapFileUpload())
+  .then(() => bootstrapPerformance())
   .then(() => {
     app.listen(3007, () => {
       console.log('http://127.0.0.1:3007')
     })
   })
   .catch((error) => {
-    console.error('RBAC 初始化失败：', error)
+    console.error('服务初始化失败：', error)
     process.exit(1)
   })

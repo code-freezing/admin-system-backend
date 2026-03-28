@@ -6,6 +6,21 @@
  */
 
 const db = require('../db/index')
+const MESSAGE_LIST_COLUMNS = `
+  id,
+  message_title,
+  message_category,
+  message_publish_department,
+  message_publish_name,
+  message_publish_time,
+  message_update_time,
+  message_delete_time,
+  message_click_number,
+  message_status,
+  message_receipt_object,
+  message_level,
+  message_content
+`
 
 // 消息模块负责公告发布、筛选、详情、回收站和分页统计。
 // message_status 为 0 表示正常消息，为 1 表示已进入回收站。
@@ -57,9 +72,15 @@ exports.publishMessage = (req, res) => {
 // 首页公告面板只取最新 5 条，避免一次加载过多历史数据。
 exports.companyMessageList = (req, res) => {
   // 这是首页“公司公告”区域使用的接口，不是后台消息列表页的分页接口。
-  const sql =
-    'select * from message where message_category = "公司公告" and message_status = "0" order by message_publish_time DESC limit 5'
-  db.query(sql, (err, result) => {
+  const sql = `
+    select ${MESSAGE_LIST_COLUMNS}
+    from message
+    where message_category = ?
+      and message_status = 0
+    order by message_publish_time desc
+    limit 5
+  `
+  db.query(sql, ['公司公告'], (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
   })
@@ -67,9 +88,15 @@ exports.companyMessageList = (req, res) => {
 
 exports.systemMessageList = (req, res) => {
   // 这是首页“系统消息”区域使用的接口。
-  const sql =
-    'select * from message where message_category = "系统消息" and message_status = "0"  order by message_publish_time DESC limit 5'
-  db.query(sql, (err, result) => {
+  const sql = `
+    select ${MESSAGE_LIST_COLUMNS}
+    from message
+    where message_category = ?
+      and message_status = 0
+    order by message_publish_time desc
+    limit 5
+  `
+  db.query(sql, ['系统消息'], (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
   })
@@ -178,7 +205,13 @@ exports.editMessage = (req, res) => {
 
 exports.searchMessageBydepartment = (req, res) => {
   // 对应前端公司消息列表里的“按发布部门筛选”。
-  const sql = 'select * from message where message_publish_department = ? and message_status = "0"'
+  const sql = `
+    select ${MESSAGE_LIST_COLUMNS}
+    from message
+    where message_publish_department = ?
+      and message_status = 0
+    order by message_publish_time desc
+  `
   db.query(sql, req.body.message_publish_department, (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
@@ -187,7 +220,13 @@ exports.searchMessageBydepartment = (req, res) => {
 
 exports.searchMessageByLevel = (req, res) => {
   // 对应前端公司消息列表里的“按级别筛选”。
-  const sql = 'select * from message where message_level = ? and message_status = "0"'
+  const sql = `
+    select ${MESSAGE_LIST_COLUMNS}
+    from message
+    where message_level = ?
+      and message_status = 0
+    order by message_publish_time desc
+  `
   db.query(sql, req.body.message_level, (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
@@ -235,7 +274,12 @@ exports.firstDelete = (req, res) => {
 
 exports.recycleList = (req, res) => {
   // 对应消息回收站页的数据来源。
-  const sql = 'select * from message where message_status = 1'
+  const sql = `
+    select ${MESSAGE_LIST_COLUMNS}
+    from message
+    where message_status = 1
+    order by message_delete_time desc
+  `
   db.query(sql, (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
@@ -254,8 +298,14 @@ exports.getRecycleMessageLength = (req, res) => {
 
 exports.returnRecycleListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
-  const sql = `select * from message where message_status = 1 ORDER BY message_delete_time limit 10 offset ${number} `
-  db.query(sql, (err, result) => {
+  const sql = `
+    select ${MESSAGE_LIST_COLUMNS}
+    from message
+    where message_status = 1
+    order by message_delete_time desc
+    limit 10 offset ?
+  `
+  db.query(sql, [number], (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
   })
@@ -313,8 +363,15 @@ exports.getSystemMessageLength = (req, res) => {
 exports.returnCompanyListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   // 后台列表页显示的公司消息，会过滤掉已进入回收站的记录。
-  const sql = `select * from message where message_category ="公司公告" and message_status = 0 ORDER BY message_publish_time limit 10 offset ${number} `
-  db.query(sql, (err, result) => {
+  const sql = `
+    select ${MESSAGE_LIST_COLUMNS}
+    from message
+    where message_category = ?
+      and message_status = 0
+    order by message_publish_time desc
+    limit 10 offset ?
+  `
+  db.query(sql, ['公司公告', number], (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
   })
@@ -323,8 +380,15 @@ exports.returnCompanyListData = (req, res) => {
 exports.returnSystemListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   // 系统消息标签页同样只展示正常状态的数据。
-  const sql = `select * from message where message_category ="系统消息"  and message_status = 0  ORDER BY message_publish_time limit 10 offset ${number} `
-  db.query(sql, (err, result) => {
+  const sql = `
+    select ${MESSAGE_LIST_COLUMNS}
+    from message
+    where message_category = ?
+      and message_status = 0
+    order by message_publish_time desc
+    limit 10 offset ?
+  `
+  db.query(sql, ['系统消息', number], (err, result) => {
     if (err) return res.cc(err)
     res.send(result)
   })

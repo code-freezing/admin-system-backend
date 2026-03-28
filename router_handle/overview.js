@@ -6,153 +6,154 @@
  */
 
 const db = require('../db/index')
-const moment = require('moment')
+
+const query = (sql, values = []) =>
+  new Promise((resolve, reject) => {
+    db.query(sql, values, (err, results) => {
+      if (err) {
+        reject(err)
+        return
+      }
+
+      resolve(results)
+    })
+  })
+
+const COMPANY_ROLE_ORDER = ['超级管理员', '产品管理员', '用户管理员', '消息管理员', '用户']
+const MESSAGE_LEVEL_ORDER = ['一般', '重要', '必要', '紧急']
+
+const parseCategoryConfig = (value) => {
+  if (!value) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    try {
+      const fallback = Function(`return (${value})`)()
+      return Array.isArray(fallback) ? fallback : []
+    } catch {
+      return []
+    }
+  }
+}
 
 // 概览页统计接口负责把零散业务表整理成图表友好的结构。
-// 这里多数查询都保持简单，优先服务页面展示而不是做复杂报表。
+// 这里改成聚合查询，避免单页统计触发大量循环 SQL。
 
-// 先读取产品分类配置，再逐类汇总库存总价。
-exports.getCategoryAndNumber = (req, res) => {
-  const loadCategoryArray = () => {
-    return new Promise((resolve) => {
-      const sql = 'select set_value from setting where set_name = "产品设置"'
-      db.query(sql, (err, result) => {
-        if (err) return resolve([])
-        const str = result[0].set_value
-        const arr = eval('(' + str + ')')
-        resolve(arr)
-      })
-    })
-  }
+exports.getCategoryAndNumber = async (req, res) => {
+  try {
+    const [settingRows, categoryRows] = await Promise.all([
+      query('select set_value from setting where set_name = ? limit 1', ['产品设置']),
+      query(
+        `
+          select product_category, coalesce(sum(product_all_price), 0) as total_price
+          from product
+          group by product_category
+        `,
+      ),
+    ])
 
-  const loadTotalPriceByCategory = (productCategory) => {
-    return new Promise((resolve) => {
-      const sql = 'select product_all_price from product where product_category= ?'
-      db.query(sql, productCategory, (err, result) => {
-        if (err) return resolve(0)
-        let total = 0
-        for (let i = 0; i < result.length; i++) {
-          total += result[i].product_all_price
-        }
-        resolve(total)
-      })
-    })
-  }
+    const category = parseCategoryConfig(settingRows[0]?.set_value)
+    const priceMap = new Map(
+      categoryRows.map((item) => [item.product_category, Number(item.total_price || 0)]),
+    )
 
-  async function getAll() {
-    const category = await loadCategoryArray()
-    const price = []
-    for (let i = 0; i < category.length; i++) {
-      price[i] = await loadTotalPriceByCategory(category[i])
-    }
     res.send({
       category,
-      price,
+      price: category.map((item) => priceMap.get(item) || 0),
     })
+  } catch (error) {
+    res.cc(error)
   }
-
-  getAll()
 }
 
-// 身份分布图固定几个角色名称，便于前端直接渲染饼图。
-exports.getAdminAndNumber = (req, res) => {
-  const loadCountByIdentity = (identity) => {
-    return new Promise((resolve) => {
-      const sql = 'select * from users where identity = ?'
-      db.query(sql, identity, (err, result) => {
-        if (err) return resolve(0)
-        resolve(result.length)
-      })
-    })
-  }
+exports.getAdminAndNumber = async (req, res) => {
+  try {
+    const rows = await query(
+      `
+        select identity, count(*) as total
+        from users
+        group by identity
+      `,
+    )
 
-  async function getAll() {
-    const data = [
-      { value: 0, name: '超级管理员' },
-      { value: 0, name: '产品管理员' },
-      { value: 0, name: '用户管理员' },
-      { value: 0, name: '消息管理员' },
-      { value: 0, name: '用户' },
+    const countMap = new Map(rows.map((item) => [item.identity, Number(item.total || 0)]))
+    res.send({
+      data: COMPANY_ROLE_ORDER.map((name) => ({
+        name,
+        value: countMap.get(name) || 0,
+      })),
+    })
+  } catch (error) {
+    res.cc(error)
+  }
+}
+
+exports.getLevelAndNumber = async (req, res) => {
+  try {
+    const rows = await query(
+      `
+        select message_level, count(*) as total
+        from message
+        where message_status = 0
+        group by message_level
+      `,
+    )
+
+    const countMap = new Map(rows.map((item) => [item.message_level, Number(item.total || 0)]))
+    const allLevels = [
+      ...MESSAGE_LEVEL_ORDER,
+      ...rows
+        .map((item) => item.message_level)
+        .filter((level) => level && !MESSAGE_LEVEL_ORDER.includes(level)),
     ]
 
-    for (let i = 0; i < data.length; i++) {
-      data[i].value = await loadCountByIdentity(data[i].name)
-    }
-
     res.send({
-      data,
+      data: allLevels.map((name) => ({
+        name,
+        value: countMap.get(name) || 0,
+      })),
     })
+  } catch (error) {
+    res.cc(error)
   }
-
-  getAll()
 }
 
-exports.getLevelAndNumber = (req, res) => {
-  const loadCountByLevel = (messageLevel) => {
-    return new Promise((resolve) => {
-      const sql = 'select * from message where message_level = ?'
-      db.query(sql, messageLevel, (err, result) => {
-        if (err) return resolve(0)
-        resolve(result.length)
-      })
+// 近七天登录图会回溯最近 7 个自然日，并统计 login_log 中每天的记录数量。
+exports.getDayAndNumber = async (req, res) => {
+  try {
+    const rows = await query(
+      `
+        select date(login_time) as login_day, count(*) as total
+        from login_log
+        where login_time >= date_sub(curdate(), interval 6 day)
+        group by date(login_time)
+        order by login_day asc
+      `,
+    )
+
+    const countMap = new Map(
+      rows.map((item) => {
+        const key = item.login_day instanceof Date ? item.login_day.toISOString().slice(0, 10) : item.login_day
+        return [key, Number(item.total || 0)]
+      }),
+    )
+
+    const week = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date()
+      date.setHours(0, 0, 0, 0)
+      date.setDate(date.getDate() - (6 - index))
+      return date.toISOString().slice(0, 10)
     })
-  }
-
-  async function getAll() {
-    const data = [
-      { value: 0, name: '一般' },
-      { value: 0, name: '重要' },
-      { value: 0, name: '必要' },
-    ]
-
-    for (let i = 0; i < data.length; i++) {
-      data[i].value = await loadCountByLevel(data[i].name)
-    }
 
     res.send({
-      data,
-    })
-  }
-
-  getAll()
-}
-
-// 近七天登录图会回溯 7 个自然日，并统计 login_log 中每天的记录数量。
-exports.getDayAndNumber = (req, res) => {
-  const getRecentDays = () => {
-    let day = new Date()
-    let week = []
-    for (let i = 0; i < 7; i++) {
-      day.setDate(day.getDate() - 1)
-      week.push(
-        moment(day.toLocaleDateString().replace(/\//g, '-'), 'YYYY-MM-DD').format('YYYY-MM-DD')
-      )
-    }
-    return week
-  }
-
-  const loadLoginCountByDay = (loginDay) => {
-    return new Promise((resolve) => {
-      const sql = `select * from login_log where login_time like '%${loginDay}%'`
-      db.query(sql, loginDay, (err, result) => {
-        if (err) return resolve(0)
-        resolve(result.length)
-      })
-    })
-  }
-
-  async function getAll() {
-    const week = getRecentDays()
-    const number = []
-    for (let i = 0; i < week.length; i++) {
-      number[i] = await loadLoginCountByDay(week[i])
-    }
-
-    res.send({
-      number,
       week,
+      number: week.map((day) => countMap.get(day) || 0),
     })
+  } catch (error) {
+    res.cc(error)
   }
-
-  getAll()
 }
