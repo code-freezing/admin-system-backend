@@ -1,11 +1,5 @@
-/**
- * 模块说明：
- * 1. 操作日志路由声明。
- * 2. 挂载操作日志列表、搜索和分页接口。
- * 3. 日志本身的写入与查询细节在对应 handler 中处理。
- */
-
 const express = require('express')
+// 创建当前模块的路由实例，后续接口都会挂在这里。
 const router = express.Router()
 const operationLogHandler = require('../router_handle/operation_log.js')
 const { requirePermission } = require('../middleware/access')
@@ -38,4 +32,5 @@ router.post(
   operationLogHandler.clearOperationLogList
 )
 
+// 导出当前模块的路由实例，供应用入口统一挂载。
 module.exports = router

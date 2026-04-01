@@ -1,11 +1,5 @@
-/**
- * 模块说明：
- * 1. 用户与账号安全路由声明。
- * 2. 包含个人资料、头像、找回密码、用户管理和权限管理接口。
- * 3. 这是后端中接口数量最多的业务分组之一。
- */
-
 const express = require('express')
+// 创建当前模块的路由实例，后续接口都会挂在这里。
 const router = express.Router()
 const expressJoi = require('@escook/express-joi')
 const userHandler = require('../router_handle/userinfo')
@@ -19,12 +13,19 @@ const {
 
 // 用户资料与账号安全接口。
 router.post('/uploadAvatar', userHandler.uploadAvatar)
+// 处理当前接口请求，权限校验通过后继续交给业务处理层。
 router.post('/bindAccount', userHandler.bindAccount)
+// 处理当前接口请求，权限校验通过后继续交给业务处理层。
 router.post('/changePassword', expressJoi(password_limit), userHandler.changePassword)
+// 处理用户信息接口，请求进入后会继续交给业务处理层。
 router.post('/getUserInfo', userHandler.getUserInfo)
+// 处理名称接口，请求进入后会继续交给业务处理层。
 router.post('/changeName', expressJoi(name_limit), userHandler.changeName)
+// 处理当前接口请求，权限校验通过后继续交给业务处理层。
 router.post('/changeSex', userHandler.changeSex)
+// 处理当前接口请求，权限校验通过后继续交给业务处理层。
 router.post('/changeEmail', expressJoi(email_limit), userHandler.changeEmail)
+// 处理当前接口请求，权限校验通过后继续交给业务处理层。
 router.post('/verifyAccountAndEmail', userHandler.verifyAccountAndEmail)
 router.post(
   '/changePasswordInLogin',
@@ -34,6 +35,7 @@ router.post(
 
 // 后台用户管理接口。
 router.post('/createAdmin', requirePermission('api.user.admin.create'), userHandler.createAdmin)
+// 处理列表接口，请求进入后会继续交给业务处理层。
 router.post('/getAdminList', requirePermission('api.user.admin.read'), userHandler.getAdminList)
 router.post(
   '/editAdmin',
@@ -60,9 +62,13 @@ router.post(
   requirePermission('api.user.user.read'),
   userHandler.searchUserByDepartment
 )
+// 处理用户接口，请求进入后会继续交给业务处理层。
 router.post('/banUser', requirePermission('api.user.user.ban'), userHandler.banUser)
+// 处理用户接口，请求进入后会继续交给业务处理层。
 router.post('/hotUser', requirePermission('api.user.user.unban'), userHandler.hotUser)
+// 处理列表接口，请求进入后会继续交给业务处理层。
 router.post('/getBanList', requirePermission('api.user.user.read'), userHandler.getBanList)
+// 处理用户接口，请求进入后会继续交给业务处理层。
 router.post('/deleteUser', requirePermission('api.user.user.delete'), userHandler.deleteUser)
 router.post(
   '/getAdminListLength',
@@ -75,4 +81,5 @@ router.post(
   userHandler.returnListData
 )
 
+// 导出当前模块的路由实例，供应用入口统一挂载。
 module.exports = router

@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. 消息公告业务处理层。
- * 2. 负责消息发布、编辑、列表、回收站和已读状态联动等复杂逻辑。
- * 3. 它需要同时维护 message 表和 users.read_list 的一致性。
- */
-
 const db = require('../db/index')
 const MESSAGE_LIST_COLUMNS = `
   id,
@@ -28,7 +21,15 @@ const MESSAGE_LIST_COLUMNS = `
 // 1. views/message/message_list/index.vue
 // 2. views/message/components/create_edit.vue
 // 3. views/message/recycle/index.vue
+const sendStatus = (res, status, message, extra = {}) => {
+  res.send({
+    status,
+    message,
+    ...extra,
+  })
+}
 
+// 处理消息，把当前模块的关键逻辑集中在这里。
 exports.publishMessage = (req, res) => {
   const {
     message_title,
@@ -59,9 +60,7 @@ exports.publishMessage = (req, res) => {
       if (err) return res.cc(err)
       // 这里把 insertId 返回给前端，是为了让前端继续调用 department_msg 模块，
       // 把新消息 ID 追加到对应部门成员的 read_list 中。
-      res.send({
-        status: 0,
-        message: '发布消息成功',
+      sendStatus(res, 0, '发布消息成功', {
         department: message_receipt_object,
         id: result.insertId,
       })
@@ -86,6 +85,7 @@ exports.companyMessageList = (req, res) => {
   })
 }
 
+// 处理消息列表，把当前模块的关键逻辑集中在这里。
 exports.systemMessageList = (req, res) => {
   // 这是首页“系统消息”区域使用的接口。
   const sql = `
@@ -112,6 +112,7 @@ exports.editMessage = (req, res) => {
     message_level,
     id,
   } = req.body
+  // 返回部门，让上层直接消费最终结果。
   const returnOldDepartment = (messageId) => {
     return new Promise((resolve) => {
       // 编辑时要先知道旧接收对象，才能决定未读列表该迁移还是删除。
@@ -123,6 +124,7 @@ exports.editMessage = (req, res) => {
     })
   }
 
+  // 处理已读信息列表，把当前模块的关键逻辑集中在这里。
   const pushIdInReadList = (newDepartment, newId) => {
     // 某些用户已经初始化了 read_list，需要把这条消息 id 补进去，
     // 否则部门变更后他们会直接把新消息视为“已读”。
@@ -141,6 +143,7 @@ exports.editMessage = (req, res) => {
     })
   }
 
+  // 删除已读信息列表，避免旧数据继续影响后续流程。
   const deleteIdInReadList = (oldDepartment, deleteId) => {
     // 消息不再面向旧部门时，要把旧部门成员 read_list 里的这条消息移除，
     // 避免之后仍在部门消息中显示一条已经不属于他们的公告。
@@ -193,16 +196,14 @@ exports.editMessage = (req, res) => {
       ],
       (err) => {
         if (err) return res.cc(err)
-        res.send({
-          status: 0,
-          message: '编辑消息成功',
-        })
+        sendStatus(res, 0, '编辑消息成功')
       }
     )
   }
   change()
 }
 
+// 查询消息，按当前条件筛出目标结果。
 exports.searchMessageBydepartment = (req, res) => {
   // 对应前端公司消息列表里的“按发布部门筛选”。
   const sql = `
@@ -218,6 +219,7 @@ exports.searchMessageBydepartment = (req, res) => {
   })
 }
 
+// 查询消息，按当前条件筛出目标结果。
 exports.searchMessageByLevel = (req, res) => {
   // 对应前端公司消息列表里的“按级别筛选”。
   const sql = `
@@ -233,6 +235,7 @@ exports.searchMessageByLevel = (req, res) => {
   })
 }
 
+// 获取消息，让后续逻辑统一使用这一份结果。
 exports.getMessage = (req, res) => {
   // 查看详情时按主键取一条完整消息，包含富文本正文。
   const sql = 'select * from message where id = ?'
@@ -249,10 +252,7 @@ exports.updateClick = (req, res) => {
   const sql = 'update message set message_click_number = ? where id = ?'
   db.query(sql, [number, id], (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '点击率增加',
-    })
+    sendStatus(res, 0, '点击率增加')
   })
 }
 
@@ -265,13 +265,11 @@ exports.firstDelete = (req, res) => {
   const sql = 'update message set message_status = ? ,message_delete_time = ? where id = ?'
   db.query(sql, [message_status, message_delete_time, req.body.id], (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '删除成功',
-    })
+    sendStatus(res, 0, '删除成功')
   })
 }
 
+// 处理列表，把当前模块的关键逻辑集中在这里。
 exports.recycleList = (req, res) => {
   // 对应消息回收站页的数据来源。
   const sql = `
@@ -286,6 +284,7 @@ exports.recycleList = (req, res) => {
   })
 }
 
+// 获取消息，让后续逻辑统一使用这一份结果。
 exports.getRecycleMessageLength = (req, res) => {
   const sql = 'select count(*) as total from message where message_status = 1'
   db.query(sql, (err, result) => {
@@ -296,6 +295,7 @@ exports.getRecycleMessageLength = (req, res) => {
   })
 }
 
+// 返回列表数据，让上层直接消费最终结果。
 exports.returnRecycleListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = `
@@ -311,6 +311,7 @@ exports.returnRecycleListData = (req, res) => {
   })
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 exports.recover = (req, res) => {
   const message_status = 0
   const message_update_time = new Date()
@@ -318,22 +319,17 @@ exports.recover = (req, res) => {
   const sql = 'update message set message_status = ? ,message_update_time = ? where id = ?'
   db.query(sql, [message_status, message_update_time, req.body.id], (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '还原成功',
-    })
+    sendStatus(res, 0, '还原成功')
   })
 }
 
+// 删除消息，避免旧数据继续影响后续流程。
 exports.deleteMessage = (req, res) => {
   // 永久删除是回收站里的最终动作，会真正删除 message 表记录。
   const sql = 'delete from message where id = ?'
   db.query(sql, req.body.id, (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '删除消息成功',
-    })
+    sendStatus(res, 0, '删除消息成功')
   })
 }
 
@@ -350,6 +346,7 @@ exports.getCompanyMessageLength = (req, res) => {
   })
 }
 
+// 获取消息，让后续逻辑统一使用这一份结果。
 exports.getSystemMessageLength = (req, res) => {
   // 对应后台“系统消息”标签页分页器总数。
   const sql =
@@ -362,6 +359,7 @@ exports.getSystemMessageLength = (req, res) => {
   })
 }
 
+// 返回列表数据，让上层直接消费最终结果。
 exports.returnCompanyListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   // 后台列表页显示的公司消息，会过滤掉已进入回收站的记录。
@@ -379,6 +377,7 @@ exports.returnCompanyListData = (req, res) => {
   })
 }
 
+// 返回列表数据，让上层直接消费最终结果。
 exports.returnSystemListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   // 系统消息标签页同样只展示正常状态的数据。

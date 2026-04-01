@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. 用户资料与权限业务处理层。
- * 2. 同时承载个人资料、头像上传、账号安全、用户管理和权限调整。
- * 3. 这是后端最重的业务文件之一，理解它有助于读懂用户体系。
- */
-
 const db = require('../db/index.js')
 const bcrypt = require('bcrypt')
 const crypto = require('crypto')
@@ -49,14 +42,27 @@ const USER_AUTH_COLUMNS = `
 
 // 用户信息模块同时承载个人资料、找回密码和后台用户管理等能力。
 // 这里的大多数接口直接操作 users 表，少量会联动 image 表中的头像记录。
-
-const deny = (res) => {
-  return res.status(403).send({
-    status: 403,
-    message: '无权限访问',
+const sendStatus = (res, status, message, extra = {}) => {
+  res.send({
+    status,
+    message,
+    ...extra,
   })
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
+const deny = (res) => res.status(403).send({ status: 403, message: '无权限访问' })
+
+// 更新用户，保持页面状态和实际数据一致。
+const updateUserField = (res, id, field, value) => {
+  const sql = `update users set ${field} = ? where id = ?`
+  db.query(sql, [value, id], (err) => {
+    if (err) return res.cc(err)
+    sendStatus(res, 0, '修改成功')
+  })
+}
+
+// 加载用户，让后续逻辑直接复用准备好的数据。
 const loadIdentityByUserId = (id) => {
   return new Promise((resolve, reject) => {
     db.query('select identity from users where id = ? limit 1', [id], (err, result) => {
@@ -70,6 +76,7 @@ const loadIdentityByUserId = (id) => {
   })
 }
 
+// 处理已读信息，把当前模块的关键逻辑集中在这里。
 const canReadIdentity = (req, identity) => {
   if (identity === '用户') {
     return hasAnyPermission(req.accessContext, ['api.user.user.read', 'api.user.admin.read'])
@@ -112,10 +119,7 @@ exports.bindAccount = (req, res) => {
       const sql1 = 'update users set image_url = ? where account = ?'
       db.query(sql1, [url, account], (error) => {
         if (error) return res.cc(error)
-        res.send({
-          status: 0,
-          message: '修改成功',
-        })
+        sendStatus(res, 0, '修改成功')
       })
     }
   })
@@ -137,10 +141,7 @@ exports.changePassword = (req, res) => {
     const sql1 = 'update users set password = ? where id = ?'
     db.query(sql1, [req.body.newPassword, req.body.id], (error) => {
       if (error) return res.cc(error)
-      res.send({
-        status: 0,
-        message: '修改成功',
-      })
+      sendStatus(res, 0, '修改成功')
     })
   })
 }
@@ -162,10 +163,7 @@ exports.getUserInfo = (req, res) => {
   db.query(sql, req.body.id, (err, result) => {
     if (err) return res.cc(err)
     if (result.length !== 1) {
-      return res.send({
-        status: 1,
-        message: '用户不存在',
-      })
+      return sendStatus(res, 1, '用户不存在')
     }
     result[0].password = ''
     res.send(result[0])
@@ -175,38 +173,19 @@ exports.getUserInfo = (req, res) => {
 // 以下三个接口分别修改昵称、性别和邮箱，保持页面保存粒度简单明确。
 exports.changeName = (req, res) => {
   const { id, name } = req.body
-  const sql = 'update users set name = ? where id = ?'
-  db.query(sql, [name, id], (err) => {
-    if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '修改成功',
-    })
-  })
+  updateUserField(res, id, 'name', name)
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 exports.changeSex = (req, res) => {
   const { id, sex } = req.body
-  const sql = 'update users set sex = ? where id = ?'
-  db.query(sql, [sex, id], (err) => {
-    if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '修改成功',
-    })
-  })
+  updateUserField(res, id, 'sex', sex)
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 exports.changeEmail = (req, res) => {
   const { id, email } = req.body
-  const sql = 'update users set email = ? where id = ?'
-  db.query(sql, [email, id], (err) => {
-    if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '修改成功',
-    })
-  })
+  updateUserField(res, id, 'email', email)
 }
 
 // 登录页找回密码前，先校验账号和邮箱是否匹配。
@@ -216,22 +195,12 @@ exports.verifyAccountAndEmail = (req, res) => {
   db.query(sql, account, (err, result) => {
     if (err) return res.cc(err)
     if (result.length !== 1) {
-      return res.send({
-        status: 1,
-        message: '查询失败',
-      })
+      return sendStatus(res, 1, '查询失败')
     }
     if (email == result[0].email) {
-      res.send({
-        status: 0,
-        message: '查询成功',
-        id: result[0].id,
-      })
+      sendStatus(res, 0, '查询成功', { id: result[0].id })
     } else {
-      res.send({
-        status: 1,
-        message: '查询失败',
-      })
+      sendStatus(res, 1, '查询失败')
     }
   })
 }
@@ -243,10 +212,7 @@ exports.changePasswordInLogin = (req, res) => {
   const sql = 'update users set password = ? where id = ?'
   db.query(sql, [user.newPassword, user.id], (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '更新成功',
-    })
+    sendStatus(res, 0, '更新成功')
   })
 }
 
@@ -257,10 +223,7 @@ exports.createAdmin = (req, res) => {
   db.query(sql, account, (err, results) => {
     if (err) return res.cc(err)
     if (results.length > 0) {
-      return res.send({
-        status: 1,
-        message: '账号已存在',
-      })
+      return sendStatus(res, 1, '账号已存在')
     }
     const hashpassword = bcrypt.hashSync(password, 10)
     const sql1 = 'insert into users set ?'
@@ -281,18 +244,12 @@ exports.createAdmin = (req, res) => {
       (error, insertResult) => {
         if (error) return res.cc(error)
         if (insertResult.affectedRows !== 1) {
-          return res.send({
-            status: 1,
-            message: '添加管理员失败',
-          })
+          return sendStatus(res, 1, '添加管理员失败')
         }
 
         replaceUserRoles(insertResult.insertId, [getRoleCodeByIdentity(identity)]).catch(() => {})
 
-        res.send({
-          status: 0,
-          message: '添加管理员成功',
-        })
+        sendStatus(res, 0, '添加管理员成功')
       }
     )
   })
@@ -349,10 +306,7 @@ exports.editAdmin = async (req, res) => {
       const sql = 'update users set ? where id = ?'
       db.query(sql, [updateContent, updateContent.id], (error) => {
         if (error) return res.cc(error)
-        res.send({
-          status: 0,
-          message: '修改管理员信息成功',
-        })
+        sendStatus(res, 0, '修改管理员信息成功')
       })
     } else {
       const updateContent = {
@@ -368,10 +322,7 @@ exports.editAdmin = async (req, res) => {
       const sql = 'update users set ? where id = ?'
       db.query(sql, [updateContent, updateContent.id], (error) => {
         if (error) return res.cc(error)
-        res.send({
-          status: 0,
-          message: '修改管理员信息成功',
-        })
+        sendStatus(res, 0, '修改管理员信息成功')
       })
     }
   })
@@ -384,10 +335,7 @@ exports.changeIdentityToUser = (req, res) => {
   db.query(sql, [identity, req.body.id], (err) => {
     if (err) return res.cc(err)
     replaceUserRoles(req.body.id, [getRoleCodeByIdentity(identity)]).catch(() => {})
-    res.send({
-      status: 0,
-      message: '降级成功',
-    })
+    sendStatus(res, 0, '降级成功')
   })
 }
 
@@ -398,10 +346,7 @@ exports.changeIdentityToAdmin = (req, res) => {
   db.query(sql, [req.body.identity, date, req.body.id], (err) => {
     if (err) return res.cc(err)
     replaceUserRoles(req.body.id, [getRoleCodeByIdentity(req.body.identity)]).catch(() => {})
-    res.send({
-      status: 0,
-      message: '赋权成功',
-    })
+    sendStatus(res, 0, '赋权成功')
   })
 }
 
@@ -425,6 +370,7 @@ exports.searchUser = (req, res) => {
   })
 }
 
+// 查询用户部门，按当前条件筛出目标结果。
 exports.searchUserByDepartment = (req, res) => {
   const sql = `
     select ${USER_SAFE_COLUMNS}
@@ -445,25 +391,21 @@ exports.banUser = (req, res) => {
   const sql = 'update users set status = ? where id = ?'
   db.query(sql, [status, req.body.id], (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '冻结成功',
-    })
+    sendStatus(res, 0, '冻结成功')
   })
 }
 
+// 处理用户，把当前模块的关键逻辑集中在这里。
 exports.hotUser = (req, res) => {
   const status = 0
   const sql = 'update users set status = ? where id = ?'
   db.query(sql, [status, req.body.id], (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '解冻成功',
-    })
+    sendStatus(res, 0, '解冻成功')
   })
 }
 
+// 获取列表，让后续逻辑统一使用这一份结果。
 exports.getBanList = (req, res) => {
   const sql = `
     select ${USER_SAFE_COLUMNS}
@@ -486,10 +428,7 @@ exports.deleteUser = (req, res) => {
     db.query(sql1, req.body.account, (error) => {
       if (error) return res.cc(error)
       db.query('delete from sys_user_roles where user_id = ?', req.body.id, () => {})
-      res.send({
-        status: 0,
-        message: '删除用户成功',
-      })
+      sendStatus(res, 0, '删除用户成功')
     })
   })
 }
@@ -509,6 +448,7 @@ exports.getAdminListLength = (req, res) => {
   })
 }
 
+// 返回列表数据，让上层直接消费最终结果。
 exports.returnListData = (req, res) => {
   if (!canReadIdentity(req, req.body.identity)) {
     return deny(res)

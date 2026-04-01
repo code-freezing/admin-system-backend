@@ -1,11 +1,5 @@
-/**
- * 模块说明：
- * 1. 产品模块路由声明。
- * 2. 统一注册入库、出库申请、审核、分页和查询相关接口。
- * 3. 产品业务流程较长，因此路由与 handler 分离能更易读。
- */
-
 const express = require('express')
+// 创建当前模块的路由实例，后续接口都会挂在这里。
 const router = express.Router()
 const productHandler = require('../router_handle/product')
 const { requireAnyPermission, requirePermission } = require('../middleware/access')
@@ -16,7 +10,9 @@ const { requireAnyPermission, requirePermission } = require('../middleware/acces
 // 2. 出库管理：apply/withdraw/audit/getApply*/searchProductForApplyId
 // 3. 历史出库：auditProductList/getOutProductLength/searchProductForOutId
 router.post('/createProduct', requirePermission('api.product.create'), productHandler.createProduct)
+// 处理产品接口，请求进入后会继续交给业务处理层。
 router.post('/deleteProduct', requirePermission('api.product.delete'), productHandler.deleteProduct)
+// 处理产品接口，请求进入后会继续交给业务处理层。
 router.post('/editProduct', requirePermission('api.product.edit'), productHandler.editProduct)
 router.post(
   '/getProductList',
@@ -38,6 +34,7 @@ router.post(
   requirePermission('api.product.withdraw'),
   productHandler.withdrawApplyProduct
 )
+// 处理审核产品接口，请求进入后会继续交给业务处理层。
 router.post('/auditProduct', requirePermission('api.product.audit'), productHandler.auditProduct)
 router.post(
   '/searchProductForId',
@@ -90,4 +87,5 @@ router.post(
   productHandler.returnOutProductListData
 )
 
+// 导出当前模块的路由实例，供应用入口统一挂载。
 module.exports = router

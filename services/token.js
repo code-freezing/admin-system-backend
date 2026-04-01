@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. token 服务。
- * 2. 负责签发 access token / refresh token、校验 refresh token 和执行 token 轮换。
- * 3. 登录、刷新和退出登录都会通过这里完成底层认证操作。
- */
-
 const jwt = require('jsonwebtoken')
 const jwtconfig = require('../jwt_config')
 const { getRefreshToken, revokeRefreshToken, saveRefreshToken } = require('./refresh_token_store')
@@ -37,6 +30,7 @@ const sanitizeUser = (user) => ({
   update_time: '',
 })
 
+// 处理Token，把当前模块的关键逻辑集中在这里。
 const issueTokenPair = async (user) => {
   const tokenUser = sanitizeUser(user)
 
@@ -69,6 +63,7 @@ const issueTokenPair = async (user) => {
   }
 }
 
+// 校验刷新流程Token，确保当前请求符合业务要求。
 const verifyRefreshToken = async (refreshToken) => {
   // 先查数据库，再验签；两边都通过才说明 refresh token 仍然可用。
   const storedToken = await getRefreshToken(refreshToken)
@@ -84,12 +79,14 @@ const verifyRefreshToken = async (refreshToken) => {
   return decoded
 }
 
+// 处理刷新流程Token，把当前模块的关键逻辑集中在这里。
 const rotateRefreshToken = async (refreshToken, user) => {
   // 刷新成功后立刻废弃旧 refresh token，并生成一对新的 token。
   await revokeRefreshToken(refreshToken)
   return issueTokenPair(user)
 }
 
+// 导出当前模块的公共能力，方便其他业务文件按需复用。
 module.exports = {
   issueTokenPair,
   revokeRefreshToken,

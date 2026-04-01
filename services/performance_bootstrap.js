@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. 性能相关数据库初始化。
- * 2. 负责按真实查询模式补齐热点索引，避免分页、筛选和统计长期走全表扫描。
- * 3. 启动时幂等执行，不要求人工单独维护数据库结构。
- */
-
 const db = require('../db')
 
 const query = (sql, values = []) =>
@@ -19,6 +12,7 @@ const query = (sql, values = []) =>
     })
   })
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const ensureIndex = async (tableName, indexName, columnSql) => {
   const rows = await query(
     `
@@ -38,6 +32,7 @@ const ensureIndex = async (tableName, indexName, columnSql) => {
   await query(`alter table ${tableName} add index ${indexName} ${columnSql}`)
 }
 
+// 初始化当前模块，确保启动后具备完整运行条件。
 const bootstrapPerformance = async () => {
   await ensureIndex('users', 'idx_users_identity', '(identity)')
   await ensureIndex('users', 'idx_users_department', '(department)')
@@ -70,6 +65,7 @@ const bootstrapPerformance = async () => {
   await ensureIndex('operation_log', 'idx_operation_log_person', '(operation_person)')
 }
 
+// 导出当前模块的公共能力，方便其他业务文件按需复用。
 module.exports = {
   bootstrapPerformance,
 }

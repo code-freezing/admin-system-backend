@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. 认证业务处理层。
- * 2. 负责注册、登录、刷新 token、退出登录以及按身份返回菜单。
- * 3. 这是后端登录态管理和前端动态菜单的核心桥梁。
- */
-
 const db = require('../db/index.js')
 const bcrypt = require('bcrypt')
 const jwtconfig = require('../jwt_config')
@@ -47,6 +40,23 @@ const query = (sql, values = []) =>
     })
   })
 
+const sendStatus = (res, status, message, extra = {}) => {
+  res.send({
+    status,
+    message,
+    ...extra,
+  })
+}
+
+// 统一发送错误结果，避免不同分支各自拼接响应结构。
+const sendUnauthorized = (res, message) => {
+  res.status(401).send({
+    status: 401,
+    message,
+  })
+}
+
+// 解析当前输入，把原始内容转成后续可直接使用的结构。
 const parseExpiresInToMs = (value) => {
   const match = String(value)
     .trim()
@@ -74,10 +84,12 @@ const getRefreshCookieOptions = () => ({
   maxAge: parseExpiresInToMs(jwtconfig.refreshTokenExpiresIn),
 })
 
+// 更新刷新流程TokenCookie，避免状态分散在多个位置维护。
 const setRefreshTokenCookie = (res, refreshToken) => {
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshCookieOptions())
 }
 
+// 清理刷新流程TokenCookie，防止旧状态残留到下一次流程。
 const clearRefreshTokenCookie = (res) => {
   res.clearCookie(REFRESH_COOKIE_NAME, {
     ...getRefreshCookieOptions(),
@@ -89,27 +101,23 @@ const clearRefreshTokenCookie = (res) => {
 const findUserByAccount = (account) =>
   query(`select ${AUTH_USER_COLUMNS} from users where account = ? limit 1`, [account])
 
+// 处理用户，把当前模块的关键逻辑集中在这里。
 const findUserById = (id) =>
   query(`select ${AUTH_USER_COLUMNS} from users where id = ? limit 1`, [id])
 
+// 处理当前注册流程，把账号信息正式写入系统。
 exports.register = async (req, res) => {
   const regInfo = req.body
 
   if (!regInfo.account || !regInfo.password) {
-    return res.send({
-      status: 1,
-      message: '账号或密码不能为空',
-    })
+    return sendStatus(res, 1, '账号或密码不能为空')
   }
 
   try {
     const results = await query('select id from users where account = ? limit 1', [regInfo.account])
 
     if (results.length > 0) {
-      return res.send({
-        status: 1,
-        message: '账号已存在',
-      })
+      return sendStatus(res, 1, '账号已存在')
     }
 
     const hashedPassword = bcrypt.hashSync(regInfo.password, 10)
@@ -122,23 +130,18 @@ exports.register = async (req, res) => {
     })
 
     if (insertResult.affectedRows !== 1) {
-      return res.send({
-        status: 1,
-        message: '注册账号失败',
-      })
+      return sendStatus(res, 1, '注册账号失败')
     }
 
     await replaceUserRoles(insertResult.insertId, [getRoleCodeByIdentity('用户')])
 
-    res.send({
-      status: 0,
-      message: '注册账号成功',
-    })
+    sendStatus(res, 0, '注册账号成功')
   } catch (error) {
     res.cc(error)
   }
 }
 
+// 处理当前登录流程，在认证通过后建立当前会话。
 exports.login = async (req, res) => {
   const logInfo = req.body
 
@@ -172,14 +175,12 @@ exports.login = async (req, res) => {
   }
 }
 
+// 刷新Token，避免旧凭证过期后直接中断当前会话。
 exports.refreshToken = async (req, res) => {
   const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME]
 
   if (!refreshToken) {
-    return res.status(401).send({
-      status: 401,
-      message: '缺少 RefreshToken',
-    })
+    return sendUnauthorized(res, '缺少 RefreshToken')
   }
 
   let decoded
@@ -188,10 +189,7 @@ exports.refreshToken = async (req, res) => {
     decoded = await verifyRefreshToken(refreshToken)
   } catch (error) {
     clearRefreshTokenCookie(res)
-    return res.status(401).send({
-      status: 401,
-      message: error.message,
-    })
+    return sendUnauthorized(res, error.message)
   }
 
   try {
@@ -200,10 +198,7 @@ exports.refreshToken = async (req, res) => {
       // token 虽然合法，但用户可能已经被删除，此时也必须把旧会话清掉。
       await revokeRefreshToken(refreshToken)
       clearRefreshTokenCookie(res)
-      return res.status(401).send({
-        status: 401,
-        message: '用户不存在，请重新登录',
-      })
+      return sendUnauthorized(res, '用户不存在，请重新登录')
     }
 
     const user = results[0]
@@ -211,26 +206,20 @@ exports.refreshToken = async (req, res) => {
       // 账号被冻结后，不允许继续通过 refresh token 延长会话。
       await revokeRefreshToken(refreshToken)
       clearRefreshTokenCookie(res)
-      return res.status(401).send({
-        status: 401,
-        message: '账号被冻结，请重新登录',
-      })
+      return sendUnauthorized(res, '账号被冻结，请重新登录')
     }
 
     // 每次刷新都会旋转 refresh token，旧 token 会在数据库里被撤销。
     const tokens = await rotateRefreshToken(refreshToken, user)
     setRefreshTokenCookie(res, tokens.refreshToken)
 
-    res.send({
-      status: 0,
-      message: '刷新成功',
-      accessToken: tokens.accessToken,
-    })
+    sendStatus(res, 0, '刷新成功', { accessToken: tokens.accessToken })
   } catch (error) {
     res.cc(error)
   }
 }
 
+// 处理当前退出流程，把会话和相关凭证一起清掉。
 exports.logout = async (req, res) => {
   const refreshToken = req.cookies?.[REFRESH_COOKIE_NAME]
 
@@ -241,26 +230,19 @@ exports.logout = async (req, res) => {
 
     clearRefreshTokenCookie(res)
 
-    res.send({
-      status: 0,
-      message: '退出登录成功',
-    })
+    sendStatus(res, 0, '退出登录成功')
   } catch (error) {
     res.cc(error)
   }
 }
 
+// 处理鉴权资料，把当前模块的关键逻辑集中在这里。
 exports.authProfile = async (req, res) => {
   if (!req.accessContext) {
-    return res.status(401).send({
-      status: 401,
-      message: '无效的 Token',
-    })
+    return sendUnauthorized(res, '无效的 Token')
   }
 
-  res.send({
-    status: 0,
-    message: '获取权限上下文成功',
+  sendStatus(res, 0, '获取权限上下文成功', {
     user: req.accessContext.user,
     roles: req.accessContext.roles,
     permissionCodes: req.accessContext.permissionCodes,
@@ -268,12 +250,10 @@ exports.authProfile = async (req, res) => {
   })
 }
 
+// 返回菜单列表，让上层直接消费最终结果。
 exports.returnMenuList = (req, res) => {
   if (!req.accessContext) {
-    return res.status(401).send({
-      status: 401,
-      message: '无效的 Token',
-    })
+    return sendUnauthorized(res, '无效的 Token')
   }
 
   res.send(req.accessContext.menuTree)

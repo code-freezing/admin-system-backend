@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. 产品出入库业务处理层。
- * 2. 负责库存入库、出库申请、审核、分页统计和历史记录查询。
- * 3. 产品模块的数据流较长，是理解项目业务的重要入口。
- */
-
 const db = require('../db/index')
 const { ROLE_CODES } = require('../services/access_control')
 const PRODUCT_COLUMNS = `
@@ -53,20 +46,25 @@ const OUT_PRODUCT_COLUMNS = `
 // 1. views/product/product_manage_list/index.vue
 // 2. views/product/components/apply.vue
 // 3. views/product/components/audit.vue
+const sendStatus = (res, status, message, extra = {}) => {
+  res.send({
+    status,
+    message,
+    ...extra,
+  })
+}
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const isEmployee = (req) => {
   return (
     Array.isArray(req.accessContext?.roles) && req.accessContext.roles.includes(ROLE_CODES.EMPLOYEE)
   )
 }
 
-const deny = (res) => {
-  return res.status(403).send({
-    status: 403,
-    message: '无权限访问',
-  })
-}
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
+const deny = (res) => res.status(403).send({ status: 403, message: '无权限访问' })
 
+// 获取产品，让后续逻辑统一使用这一份结果。
 const getProductRowById = (id) => {
   return new Promise((resolve, reject) => {
     db.query(
@@ -103,10 +101,7 @@ exports.createProduct = (req, res) => {
     if (err) return res.cc(err)
     if (results.length > 0) {
       // 入库编号是库存记录的业务唯一标识，和数据库自增 id 不是一回事。
-      return res.send({
-        status: 1,
-        message: '产品编号已存在',
-      })
+      return sendStatus(res, 1, '产品编号已存在')
     }
     const sql = 'insert into product set ?'
     db.query(
@@ -125,24 +120,19 @@ exports.createProduct = (req, res) => {
       },
       (error) => {
         if (error) return res.cc(error)
-        res.send({
-          status: 0,
-          message: '添加产品成功',
-        })
+        sendStatus(res, 0, '添加产品成功')
       }
     )
   })
 }
 
+// 删除产品，避免旧数据继续影响后续流程。
 exports.deleteProduct = (req, res) => {
   // 删除的是当前库存记录，不会去碰已经写入 outproduct 的出库历史。
   const sql = 'delete from product where id = ?'
   db.query(sql, req.body.id, (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '删除产品成功',
-    })
+    sendStatus(res, 0, '删除产品成功')
   })
 }
 
@@ -176,10 +166,7 @@ exports.editProduct = (req, res) => {
     ],
     (err) => {
       if (err) return res.cc(err)
-      res.send({
-        status: 0,
-        message: '编辑产品信息成功',
-      })
+      sendStatus(res, 0, '编辑产品信息成功')
     }
   )
 }
@@ -213,10 +200,7 @@ exports.applyOutProduct = (req, res) => {
     if (err) return res.cc(err)
     if (result.length > 0) {
       // 出库编号对应前端“申请编号”，用于追踪一次具体出库流程，因此也要求唯一。
-      return res.send({
-        status: 1,
-        message: '申请出库编号已存在',
-      })
+      return sendStatus(res, 1, '申请出库编号已存在')
     }
     const sql =
       'update product set product_out_status = ?,product_out_id=?,product_out_number=?,product_out_price=?,product_out_apply_person=?,product_out_apply_user_id=?,product_out_apply_account=?,apply_memo=?,product_apply_time= ? where id = ?'
@@ -238,10 +222,7 @@ exports.applyOutProduct = (req, res) => {
         if (error) return res.cc(error)
         // 这里只是在 product 表上“挂起一条申请”，
         // 目的是让审核列表直接从当前库存表就能看到待处理记录。
-        res.send({
-          status: 0,
-          message: '申请出库成功',
-        })
+        sendStatus(res, 0, '申请出库成功')
       }
     )
   })
@@ -261,16 +242,14 @@ exports.applyProductList = (req, res) => {
   })
 }
 
+// 处理申请产品，把当前模块的关键逻辑集中在这里。
 exports.withdrawApplyProduct = async (req, res) => {
   // 撤回申请的本质是把这一整组申请态字段恢复为 NULL，
   // 让当前产品重新回到“可再次申请出库”的普通库存状态。
   try {
     const currentRow = await getProductRowById(req.body.id)
     if (!currentRow) {
-      return res.send({
-        status: 1,
-        message: '申请记录不存在',
-      })
+      return sendStatus(res, 1, '申请记录不存在')
     }
 
     if (isEmployee(req) && currentRow.product_out_apply_user_id !== req.accessContext.user.id) {
@@ -284,10 +263,7 @@ exports.withdrawApplyProduct = async (req, res) => {
     'update product set product_out_id = NULL,product_out_status = NULL , product_out_number =NULL,product_out_apply_person=NULL,product_out_apply_user_id=NULL,product_out_apply_account=NULL,apply_memo =NULL,product_out_price =NULL,product_apply_time = NULL where id = ?'
   db.query(sql, req.body.id, (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '撤回申请出库成功',
-    })
+    sendStatus(res, 0, '撤回申请出库成功')
   })
 }
 
@@ -340,10 +316,7 @@ exports.auditProduct = (req, res) => {
           'update product set product_in_warehouse_number = ?,product_all_price = ?,product_out_status = NULL ,product_out_id = NULL,product_out_number =NULL,product_out_apply_person=NULL,product_out_apply_user_id=NULL,product_out_apply_account=NULL,apply_memo =NULL,product_out_price =NULL,product_apply_time = NULL where id = ?'
         db.query(sql1, [newWarehouseNumber, product_all_price, req.body.id], (error) => {
           if (error) return res.cc(error)
-          res.send({
-            status: 0,
-            message: '产品出库成功',
-          })
+          sendStatus(res, 0, '产品出库成功')
         })
       }
     )
@@ -358,10 +331,7 @@ exports.auditProduct = (req, res) => {
       [audit_memo, product_out_status, product_audit_time, product_out_audit_person, id],
       (err) => {
         if (err) return res.cc(err)
-        res.send({
-          status: 0,
-          message: '产品已被否决',
-        })
+        sendStatus(res, 0, '产品已被否决')
       }
     )
   }
@@ -376,6 +346,7 @@ exports.searchProductForId = (req, res) => {
   })
 }
 
+// 查询产品申请，按当前条件筛出目标结果。
 exports.searchProductForApplyId = (req, res) => {
   const sql = isEmployee(req)
     ? `select ${PRODUCT_COLUMNS} from product where product_out_id = ? and product_out_apply_user_id = ?`
@@ -389,6 +360,7 @@ exports.searchProductForApplyId = (req, res) => {
   })
 }
 
+// 查询产品，按当前条件筛出目标结果。
 exports.searchProductForOutId = (req, res) => {
   const sql = isEmployee(req)
     ? `select ${OUT_PRODUCT_COLUMNS} from outproduct where product_out_id = ? and product_out_apply_user_id = ?`
@@ -414,6 +386,7 @@ exports.getProductLength = (req, res) => {
   })
 }
 
+// 获取申请产品，让后续逻辑统一使用这一份结果。
 exports.getApplyProductLength = (req, res) => {
   // 对应前端“出库管理”标签页的分页器总数。
   const sql = isEmployee(req)
@@ -428,6 +401,7 @@ exports.getApplyProductLength = (req, res) => {
   })
 }
 
+// 处理产品列表，确保审核动作按当前规则落地。
 exports.auditProductList = (req, res) => {
   // 这个列表对应的是已经完成的历史出库记录，而不是当前待审核申请。
   const sql = isEmployee(req)
@@ -440,6 +414,7 @@ exports.auditProductList = (req, res) => {
   })
 }
 
+// 获取产品，让后续逻辑统一使用这一份结果。
 exports.getOutProductLength = (req, res) => {
   const sql = isEmployee(req)
     ? 'select count(*) as total from outproduct where product_out_apply_user_id = ?'
@@ -453,6 +428,7 @@ exports.getOutProductLength = (req, res) => {
   })
 }
 
+// 返回产品列表数据，让上层直接消费最终结果。
 exports.returnProductListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   // 这里通过 offset 做最基础的分页，前端约定每页固定 10 条。
@@ -469,6 +445,7 @@ exports.returnProductListData = (req, res) => {
   })
 }
 
+// 返回申请产品列表数据，让上层直接消费最终结果。
 exports.returnApplyProductListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   // “申请出库”和“否决”两种状态都留在这里，
@@ -496,6 +473,7 @@ exports.returnApplyProductListData = (req, res) => {
   })
 }
 
+// 返回产品列表数据，让上层直接消费最终结果。
 exports.returnOutProductListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
   const sql = isEmployee(req)

@@ -1,10 +1,4 @@
-/**
- * 模块说明：
- * 1. JWT 配置文件。
- * 2. 集中存放 access token 与 refresh token 的密钥和过期时间配置。
- * 3. 认证服务和应用入口都会依赖这里的配置。
- */
-
+// 导出当前模块的公共能力，方便其他业务文件按需复用。
 module.exports = {
   accessTokenSecretKey: 'codefreezing-access',
   refreshTokenSecretKey: 'codefreezing-refresh',

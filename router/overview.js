@@ -1,11 +1,5 @@
-/**
- * 模块说明：
- * 1. 系统概览路由声明。
- * 2. 挂载概览页所需的统计查询接口。
- * 3. 前端图表和统计卡片通过这些接口取数。
- */
-
 const express = require('express')
+// 创建当前模块的路由实例，后续接口都会挂在这里。
 const router = express.Router()
 const overviewHandler = require('../router_handle/overview.js')
 const { requirePermission } = require('../middleware/access')
@@ -32,4 +26,5 @@ router.post(
   overviewHandler.getDayAndNumber
 )
 
+// 导出当前模块的路由实例，供应用入口统一挂载。
 module.exports = router

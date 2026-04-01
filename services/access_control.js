@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. 授权上下文服务。
- * 2. 负责用户角色回填、权限码装载、菜单树裁剪和角色同步。
- * 3. 所有接口鉴权和前端权限初始化都依赖这里。
- */
-
 const db = require('../db')
 const { getRoleCodeByIdentity, menuTree, ROLE_CODES } = require('./rbac_definitions')
 
@@ -20,22 +13,16 @@ const query = (sql, values = []) =>
     })
   })
 
-const sanitizeUser = (user) => {
-  if (!user) {
-    return null
-  }
+// 处理用户，把当前模块的关键逻辑集中在这里。
+const sanitizeUser = (user) => (user ? { ...user, password: '' } : null)
 
-  return {
-    ...user,
-    password: '',
-  }
-}
-
+// 获取用户，让后续逻辑统一使用这一份结果。
 const getUserById = async (userId) => {
   const results = await query('select * from users where id = ? limit 1', [userId])
   return results[0] || null
 }
 
+// 获取角色编码，让后续逻辑统一使用这一份结果。
 const getRoleIdsByCodes = async (roleCodes) => {
   if (!Array.isArray(roleCodes) || roleCodes.length === 0) {
     return []
@@ -49,6 +36,7 @@ const getRoleIdsByCodes = async (roleCodes) => {
   return rows
 }
 
+// 处理用户角色，把当前模块的关键逻辑集中在这里。
 const replaceUserRoles = async (userId, roleCodes) => {
   const roleRows = await getRoleIdsByCodes(roleCodes)
   await query('delete from sys_user_roles where user_id = ?', [userId])
@@ -64,6 +52,7 @@ const replaceUserRoles = async (userId, roleCodes) => {
   }
 }
 
+// 处理用户角色，把当前模块的关键逻辑集中在这里。
 const ensureUserRoleAssignment = async (user) => {
   const countRows = await query('select count(*) as count from sys_user_roles where user_id = ?', [
     user.id,
@@ -76,6 +65,7 @@ const ensureUserRoleAssignment = async (user) => {
   await replaceUserRoles(user.id, [roleCode])
 }
 
+// 加载用户角色，让后续逻辑直接复用准备好的数据。
 const loadUserRoles = async (userId) => {
   const rows = await query(
     `
@@ -91,6 +81,7 @@ const loadUserRoles = async (userId) => {
   return rows
 }
 
+// 加载权限编码，让后续逻辑直接复用准备好的数据。
 const loadPermissionCodes = async (userId) => {
   const rows = await query(
     `
@@ -106,6 +97,7 @@ const loadPermissionCodes = async (userId) => {
   return rows.map((item) => item.code)
 }
 
+// 处理菜单树结构权限，把当前模块的关键逻辑集中在这里。
 const filterMenuTreeByPermissions = (nodes, permissionCodeSet) => {
   return nodes.reduce((result, node) => {
     const hasChildren = Array.isArray(node.children) && node.children.length > 0
@@ -130,6 +122,7 @@ const filterMenuTreeByPermissions = (nodes, permissionCodeSet) => {
   }, [])
 }
 
+// 构建访问控制上下文，把零散输入整理成后续可消费的结果。
 const buildAccessContext = async (userId) => {
   const user = await getUserById(userId)
   if (!user) {
@@ -151,6 +144,7 @@ const buildAccessContext = async (userId) => {
   }
 }
 
+// 处理权限，把当前模块的关键逻辑集中在这里。
 const hasPermission = (accessContext, permissionCode) => {
   if (!accessContext || !permissionCode) {
     return false
@@ -163,14 +157,16 @@ const hasAnyPermission = (accessContext, permissionCodes = []) => {
   return permissionCodes.some((code) => hasPermission(accessContext, code))
 }
 
+// 处理角色，把当前模块的关键逻辑集中在这里。
 const hasRole = (accessContext, roleCode) => {
   if (!accessContext || !roleCode) {
     return false
   }
 
-  return Array.isArray(accessContext.roles) && accessContext.roles.includes(roleCode)
+  return accessContext.roles.includes(roleCode)
 }
 
+// 导出当前模块的公共能力，方便其他业务文件按需复用。
 module.exports = {
   ROLE_CODES,
   buildAccessContext,

@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. 文件管理业务处理层。
- * 2. 支持文件列表、删除、下载，以及分片上传、秒传和断点续传。
- * 3. 文件物理存储与业务记录分离：同一内容只保留一份物理文件，列表可保留多条业务记录。
- */
-
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
@@ -28,6 +21,13 @@ const FILE_LIST_COLUMNS = `
   storage_path,
   status
 `
+const sendStatus = (res, status, message, extra = {}) => {
+  res.send({
+    status,
+    message,
+    ...extra,
+  })
+}
 
 const query = (sql, values = []) =>
   new Promise((resolve, reject) => {
@@ -41,6 +41,7 @@ const query = (sql, values = []) =>
     })
   })
 
+// 整理当前输入，确保后续流程直接消费统一结构。
 const buildPublicUrl = (req, storagePath) => {
   if (!storagePath) {
     return null
@@ -53,10 +54,12 @@ const normalizeFileName = (originalName = '') => {
   return Buffer.from(originalName, 'latin1').toString('utf8')
 }
 
+// 处理文件大小，把当前模块的关键逻辑集中在这里。
 const toFileSizeKb = (sizeBytes) => {
   return (Number(sizeBytes || 0) / 1024).toFixed(2)
 }
 
+// 处理路径，把当前模块的关键逻辑集中在这里。
 const toAbsolutePath = (storagePath) => {
   if (!storagePath) {
     return null
@@ -65,6 +68,7 @@ const toAbsolutePath = (storagePath) => {
   return path.join(PUBLIC_ROOT, storagePath.replace(/^\//, ''))
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const exists = async (targetPath) => {
   if (!targetPath) {
     return false
@@ -78,12 +82,14 @@ const exists = async (targetPath) => {
   }
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const ensureChunkDir = async (uploadId) => {
   const chunkDir = path.join(CHUNK_ROOT, uploadId)
   await fs.promises.mkdir(chunkDir, { recursive: true })
   return chunkDir
 }
 
+// 移除不再需要的记录，避免脏数据继续留在当前流程里。
 const removeChunkDir = async (uploadId) => {
   const chunkDir = path.join(CHUNK_ROOT, uploadId)
   if (await exists(chunkDir)) {
@@ -91,6 +97,7 @@ const removeChunkDir = async (uploadId) => {
   }
 }
 
+// 处理文件，把当前模块的关键逻辑集中在这里。
 const hashFile = (targetPath) =>
   new Promise((resolve, reject) => {
     const hash = crypto.createHash('md5')
@@ -101,6 +108,7 @@ const hashFile = (targetPath) =>
     stream.on('end', () => resolve(hash.digest('hex')))
   })
 
+// 解析当前输入，把原始内容转成后续可直接使用的结构。
 const parseUploadedChunks = (value) => {
   if (!value) {
     return []
@@ -121,6 +129,7 @@ const parseUploadedChunks = (value) => {
   }
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const stringifyUploadedChunks = (chunks) => {
   const normalized = Array.from(new Set(chunks))
     .map((item) => Number(item))
@@ -130,14 +139,17 @@ const stringifyUploadedChunks = (chunks) => {
   return JSON.stringify(normalized)
 }
 
+// 获取当前状态用户名称，让后续逻辑统一使用这一份结果。
 const getCurrentUserName = (req) => {
   return req.accessContext?.user?.name || req.body?.name || ''
 }
 
+// 获取当前状态用户，让后续逻辑统一使用这一份结果。
 const getCurrentUserKey = (req) => {
   return req.accessContext?.user?.account || req.accessContext?.user?.id || 'anonymous'
 }
 
+// 获取文件记录，让后续逻辑统一使用这一份结果。
 const getReadyFileRecordById = async (id) => {
   const rows = await query(
     `
@@ -153,6 +165,7 @@ const getReadyFileRecordById = async (id) => {
   return rows[0] || null
 }
 
+// 获取文件，让后续逻辑统一使用这一份结果。
 const getFileObjectByHash = async (contentHash) => {
   const rows = await query('select * from file_objects where content_hash = ? limit 1', [
     contentHash,
@@ -160,15 +173,18 @@ const getFileObjectByHash = async (contentHash) => {
   return rows[0] || null
 }
 
+// 获取文件，让后续逻辑统一使用这一份结果。
 const getFileObjectById = async (id) => {
   const rows = await query('select * from file_objects where id = ? limit 1', [id])
   return rows[0] || null
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const incrementObjectRefCount = async (objectId) => {
   await query('update file_objects set ref_count = ref_count + 1 where id = ?', [objectId])
 }
 
+// 创建文件记录，把当前输入转成新的业务记录。
 const createFileRecord = async (req, payload) => {
   const result = await query('insert into files set ?', {
     object_id: payload.objectId,
@@ -187,6 +203,7 @@ const createFileRecord = async (req, payload) => {
   return rows[0]
 }
 
+// 创建文件记录，把当前输入转成新的业务记录。
 const createFileRecordFromObject = async (req, fileObject, fileName, uploadPerson) => {
   await incrementObjectRefCount(fileObject.id)
   return createFileRecord(req, {
@@ -199,6 +216,7 @@ const createFileRecordFromObject = async (req, fileObject, fileName, uploadPerso
   })
 }
 
+// 获取会话，让后续逻辑统一使用这一份结果。
 const getPendingSession = async (payload) => {
   const rows = await query(
     `
@@ -228,6 +246,7 @@ const getPendingSession = async (payload) => {
   return rows[0] || null
 }
 
+// 创建上传会话，把当前输入转成新的业务记录。
 const createUploadSession = async (payload) => {
   const uploadId = crypto.randomBytes(16).toString('hex')
   await query(
@@ -256,6 +275,7 @@ const createUploadSession = async (payload) => {
   }
 }
 
+// 获取会话上传，让后续逻辑统一使用这一份结果。
 const getSessionByUploadId = async (uploadId) => {
   const rows = await query('select * from file_upload_sessions where upload_id = ? limit 1', [
     uploadId,
@@ -263,6 +283,7 @@ const getSessionByUploadId = async (uploadId) => {
   return rows[0] || null
 }
 
+// 更新会话，保持页面状态和实际数据一致。
 const updateSessionChunks = async (uploadId, chunks) => {
   await query(
     `
@@ -276,6 +297,7 @@ const updateSessionChunks = async (uploadId, chunks) => {
   )
 }
 
+// 处理会话状态，把当前模块的关键逻辑集中在这里。
 const markSessionStatus = async (uploadId, status) => {
   await query(
     `
@@ -288,6 +310,7 @@ const markSessionStatus = async (uploadId, status) => {
   )
 }
 
+// 创建文件，把当前输入转成新的业务记录。
 const createFileObject = async (payload) => {
   const result = await query(
     `
@@ -320,6 +343,7 @@ const resolveFileExtension = (fileName, mimeType = '') => {
   return ''
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const mergeChunksToObject = async (session) => {
   const extension = resolveFileExtension(session.file_name, session.mime_type)
   const objectStoragePath = `/upload/objects/${session.content_hash}${extension}`
@@ -370,6 +394,7 @@ const mergeChunksToObject = async (session) => {
   }
 }
 
+// 处理文件会话，把当前模块的关键逻辑集中在这里。
 const ensureFileObjectForSession = async (session) => {
   const existing = await getFileObjectByHash(session.content_hash)
   const existingAbsolutePath = toAbsolutePath(existing?.storage_path)
@@ -394,6 +419,7 @@ const ensureFileObjectForSession = async (session) => {
   })
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const validateInitPayload = (body) => {
   const fileName = String(body.fileName || '').trim()
   const contentHash = String(body.contentHash || '').trim()
@@ -416,14 +442,12 @@ const validateInitPayload = (body) => {
   }
 }
 
+// 处理上传，把当前模块的关键逻辑集中在这里。
 exports.initMultipartUpload = async (req, res) => {
   try {
     const payload = validateInitPayload(req.body)
     if (!payload) {
-      return res.send({
-        status: 1,
-        message: '上传初始化参数不完整',
-      })
+      return sendStatus(res, 1, '上传初始化参数不完整')
     }
 
     const uploadPerson = getCurrentUserName(req)
@@ -438,8 +462,7 @@ exports.initMultipartUpload = async (req, res) => {
         payload.fileName,
         uploadPerson
       )
-      return res.send({
-        status: 0,
+      return sendStatus(res, 0, '', {
         uploadId: '',
         shouldUpload: false,
         uploadedChunks: [],
@@ -457,8 +480,7 @@ exports.initMultipartUpload = async (req, res) => {
         createdBy,
       }))
 
-    return res.send({
-      status: 0,
+    return sendStatus(res, 0, '', {
       uploadId: session.upload_id,
       shouldUpload: true,
       uploadedChunks: parseUploadedChunks(session.uploaded_chunks),
@@ -468,6 +490,7 @@ exports.initMultipartUpload = async (req, res) => {
   }
 }
 
+// 处理当前文件操作，把文件保存到约定位置后再继续后续流程。
 exports.uploadChunk = async (req, res) => {
   try {
     const uploadId = String(req.body.uploadId || '').trim()
@@ -482,25 +505,16 @@ exports.uploadChunk = async (req, res) => {
       chunkIndex < 0 ||
       !chunkFile
     ) {
-      return res.send({
-        status: 1,
-        message: '分片参数不完整',
-      })
+      return sendStatus(res, 1, '分片参数不完整')
     }
 
     const session = await getSessionByUploadId(uploadId)
     if (!session || session.status !== 'pending') {
-      return res.send({
-        status: 1,
-        message: '上传会话不存在或已失效',
-      })
+      return sendStatus(res, 1, '上传会话不存在或已失效')
     }
 
     if (session.content_hash !== contentHash) {
-      return res.send({
-        status: 1,
-        message: '文件指纹不匹配',
-      })
+      return sendStatus(res, 1, '文件指纹不匹配')
     }
 
     const chunkDir = await ensureChunkDir(uploadId)
@@ -514,9 +528,7 @@ exports.uploadChunk = async (req, res) => {
 
     await updateSessionChunks(uploadId, uploadedChunks)
 
-    return res.send({
-      status: 0,
-      message: '分片上传成功',
+    return sendStatus(res, 0, '分片上传成功', {
       uploadedChunks: uploadedChunks.sort((a, b) => a - b),
     })
   } catch (error) {
@@ -524,38 +536,27 @@ exports.uploadChunk = async (req, res) => {
   }
 }
 
+// 处理上传，把当前模块的关键逻辑集中在这里。
 exports.completeMultipartUpload = async (req, res) => {
   try {
     const uploadId = String(req.body.uploadId || '').trim()
     const contentHash = String(req.body.contentHash || '').trim()
     if (!uploadId || !contentHash) {
-      return res.send({
-        status: 1,
-        message: '缺少上传会话信息',
-      })
+      return sendStatus(res, 1, '缺少上传会话信息')
     }
 
     const session = await getSessionByUploadId(uploadId)
     if (!session || session.status !== 'pending') {
-      return res.send({
-        status: 1,
-        message: '上传会话不存在或已结束',
-      })
+      return sendStatus(res, 1, '上传会话不存在或已结束')
     }
 
     if (session.content_hash !== contentHash) {
-      return res.send({
-        status: 1,
-        message: '文件指纹不匹配',
-      })
+      return sendStatus(res, 1, '文件指纹不匹配')
     }
 
     const uploadedChunks = parseUploadedChunks(session.uploaded_chunks)
     if (uploadedChunks.length !== Number(session.chunk_total)) {
-      return res.send({
-        status: 1,
-        message: '分片未上传完整',
-      })
+      return sendStatus(res, 1, '分片未上传完整')
     }
 
     const fileObject = await ensureFileObjectForSession(session)
@@ -569,41 +570,29 @@ exports.completeMultipartUpload = async (req, res) => {
     await markSessionStatus(uploadId, 'completed')
     await removeChunkDir(uploadId)
 
-    return res.send({
-      status: 0,
-      message: '文件上传成功',
-      fileRecord,
-    })
+    return sendStatus(res, 0, '文件上传成功', { fileRecord })
   } catch (error) {
     return res.cc(error)
   }
 }
 
+// 处理上传，把当前模块的关键逻辑集中在这里。
 exports.abortMultipartUpload = async (req, res) => {
   try {
     const uploadId = String(req.body.uploadId || '').trim()
     if (!uploadId) {
-      return res.send({
-        status: 1,
-        message: '缺少上传会话信息',
-      })
+      return sendStatus(res, 1, '缺少上传会话信息')
     }
 
     const session = await getSessionByUploadId(uploadId)
     if (!session) {
-      return res.send({
-        status: 0,
-        message: '上传会话已结束',
-      })
+      return sendStatus(res, 0, '上传会话已结束')
     }
 
     await markSessionStatus(uploadId, 'aborted')
     await removeChunkDir(uploadId)
 
-    return res.send({
-      status: 0,
-      message: '已取消上传',
-    })
+    return sendStatus(res, 0, '已取消上传')
   } catch (error) {
     return res.cc(error)
   }
@@ -614,10 +603,7 @@ exports.uploadFile = async (req, res) => {
   try {
     const file = req.files?.[0]
     if (!file) {
-      return res.send({
-        status: 1,
-        message: '未检测到上传文件',
-      })
+      return sendStatus(res, 1, '未检测到上传文件')
     }
 
     const fileName = normalizeFileName(file.originalname)
@@ -654,8 +640,7 @@ exports.uploadFile = async (req, res) => {
 
     const fileRecord = await createFileRecordFromObject(req, fileObject, fileName, uploadPerson)
 
-    return res.send({
-      status: 0,
+    return sendStatus(res, 0, '', {
       url: fileRecord.file_url,
       fileRecord,
     })
@@ -669,10 +654,7 @@ exports.bindFileAndUser = async (req, res) => {
   try {
     const { name, url } = req.body
     if (!name || !url) {
-      return res.send({
-        status: 1,
-        message: '绑定参数不完整',
-      })
+      return sendStatus(res, 1, '绑定参数不完整')
     }
 
     await query(
@@ -685,10 +667,7 @@ exports.bindFileAndUser = async (req, res) => {
       [name, url]
     )
 
-    return res.send({
-      status: 0,
-      message: '绑定成功',
-    })
+    return sendStatus(res, 0, '绑定成功')
   } catch (error) {
     return res.cc(error)
   }
@@ -708,10 +687,7 @@ exports.updateDownload = async (req, res) => {
       [id]
     )
 
-    return res.send({
-      status: 0,
-      message: '下载量增加',
-    })
+    return sendStatus(res, 0, '下载量增加')
   } catch (error) {
     return res.cc(error)
   }
@@ -722,10 +698,7 @@ exports.downloadFile = async (req, res) => {
   try {
     const record = await getReadyFileRecordById(req.body.id)
     if (!record) {
-      return res.send({
-        status: 1,
-        message: '文件不存在或已删除',
-      })
+      return sendStatus(res, 1, '文件不存在或已删除')
     }
 
     await query(
@@ -737,8 +710,7 @@ exports.downloadFile = async (req, res) => {
       [record.id]
     )
 
-    return res.send({
-      status: 0,
+    return sendStatus(res, 0, '', {
       url: buildPublicUrl(req, record.storage_path),
     })
   } catch (error) {
@@ -823,10 +795,7 @@ exports.deleteFile = async (req, res) => {
   try {
     const record = await getReadyFileRecordById(req.body.id)
     if (!record) {
-      return res.send({
-        status: 1,
-        message: '文件不存在或已删除',
-      })
+      return sendStatus(res, 1, '文件不存在或已删除')
     }
 
     await query(`update files set status = 'deleted' where id = ?`, [record.id])
@@ -852,10 +821,7 @@ exports.deleteFile = async (req, res) => {
       }
     }
 
-    return res.send({
-      status: 0,
-      message: '删除成功',
-    })
+    return sendStatus(res, 0, '删除成功')
   } catch (error) {
     return res.cc(error)
   }

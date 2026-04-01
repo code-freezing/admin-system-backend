@@ -1,27 +1,16 @@
-/**
- * 模块说明：
- * 1. RBAC 授权中间件。
- * 2. 负责装载当前用户权限上下文，并在路由层统一执行权限判断。
- * 3. 业务 handler 只需要处理资源级补充校验。
- */
-
 const {
   buildAccessContext,
   hasAnyPermission,
   hasPermission,
 } = require('../services/access_control')
 
-const deny = (res) => {
-  return res.status(403).send({
-    status: 403,
-    message: '无权限访问',
-  })
-}
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
+const deny = (res) => res.status(403).send({ status: 403, message: '无权限访问' })
 
+// 加载访问控制上下文，让后续逻辑直接复用准备好的数据。
 const loadAccessContext = async (req, res, next) => {
   if (!req.auth?.id) {
-    next()
-    return
+    return next()
   }
 
   try {
@@ -37,6 +26,7 @@ const loadAccessContext = async (req, res, next) => {
   }
 }
 
+// 处理权限，把当前模块的关键逻辑集中在这里。
 const requirePermission = (permissionCode) => {
   return (req, res, next) => {
     if (!hasPermission(req.accessContext, permissionCode)) {
@@ -47,6 +37,7 @@ const requirePermission = (permissionCode) => {
   }
 }
 
+// 处理权限，把当前模块的关键逻辑集中在这里。
 const requireAnyPermission = (permissionCodes) => {
   return (req, res, next) => {
     if (!hasAnyPermission(req.accessContext, permissionCodes)) {
@@ -57,6 +48,7 @@ const requireAnyPermission = (permissionCodes) => {
   }
 }
 
+// 导出当前模块的公共能力，方便其他业务文件按需复用。
 module.exports = {
   loadAccessContext,
   requirePermission,

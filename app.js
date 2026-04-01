@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. 后端应用入口。
- * 2. 负责组装中间件、静态资源、JWT 鉴权、路由挂载和统一异常处理。
- * 3. 前端所有接口最终都会从这里进入对应业务模块。
- */
-
 const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
@@ -30,6 +23,8 @@ const overviewLogRouter = require('./router/overview.js')
 const depMsgRouter = require('./router/department_msg.js')
 
 const app = express()
+// 统一发送错误结果，避免不同分支各自拼接响应结构。
+const sendError = (res, status, message) => res.status(status).send({ status, message })
 
 // 当前项目没有额外引入 cookie-parser，这里自己做一个最小版 Cookie 解析。
 const parseCookies = (cookieHeader = '') => {
@@ -111,42 +106,43 @@ app.use(loadAccessContext)
 
 // 这里把不同业务模块挂到不同的路径前缀，便于按模块拆分文件。
 app.use('/api', loginRouter)
+// 挂载用户相关路由，让这一类接口统一从对应模块进入。
 app.use('/user', userRouter)
+// 挂载当前模块相关路由，让这一类接口统一从对应模块进入。
 app.use('/set', setRouter)
+// 挂载产品相关路由，让这一类接口统一从对应模块进入。
 app.use('/pro', productRouter)
+// 挂载消息相关路由，让这一类接口统一从对应模块进入。
 app.use('/msg', messageRouter)
+// 挂载文件相关路由，让这一类接口统一从对应模块进入。
 app.use('/file', fileRouter)
+// 挂载登录日志相关路由，让这一类接口统一从对应模块进入。
 app.use('/llog', loginLogRouter)
+// 挂载日志相关路由，让这一类接口统一从对应模块进入。
 app.use('/olog', operationLogRouter)
+// 挂载概览数据日志相关路由，让这一类接口统一从对应模块进入。
 app.use('/ov', overviewLogRouter)
+// 挂载消息相关路由，让这一类接口统一从对应模块进入。
 app.use('/dm', depMsgRouter)
 
 // 统一兜底处理参数校验错误、JWT 鉴权错误和未捕获异常。
 app.use((err, req, res) => {
   if (err instanceof Joi.ValidationError) {
-    return res.status(400).send({
-      status: 1,
-      message: '输入的数据不符合验证规则',
-    })
+    return sendError(res, 400, '输入的数据不符合验证规则')
   }
 
   if (err.name === 'UnauthorizedError') {
-    return res.status(401).send({
-      status: 401,
-      message: '无效的 Token',
-    })
+    return sendError(res, 401, '无效的 Token')
   }
 
-  return res.status(500).send({
-    status: 500,
-    message: err.message || '未知错误',
-  })
+  return sendError(res, 500, err.message || '未知错误')
 })
 
 bootstrapRbac()
   .then(() => bootstrapFileUpload())
   .then(() => bootstrapPerformance())
   .then(() => {
+    // 完成全部初始化后再启动服务，避免未准备好的模块提前对外响应。
     app.listen(3007, () => {
       console.log('http://127.0.0.1:3007')
     })

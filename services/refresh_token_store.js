@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. refresh token 存储服务。
- * 2. 负责把 refresh token 以哈希形式写入数据库，并提供查询、清理和撤销能力。
- * 3. 它保证 refresh token 可以被单独失效，而不必依赖前端主动删除。
- */
-
 const crypto = require('crypto')
 const db = require('../db')
 
@@ -35,6 +28,7 @@ const cleanupExpiredTokens = async () => {
   )
 }
 
+// 保存刷新流程Token，确保当前改动能在后续流程里被读取到。
 const saveRefreshToken = async (token, payload, expiresAt) => {
   await cleanupExpiredTokens()
   await query('insert into user_refresh_tokens set ?', {
@@ -77,6 +71,7 @@ const revokeRefreshToken = async (token) => {
   )
 }
 
+// 导出当前模块的公共能力，方便其他业务文件按需复用。
 module.exports = {
   getRefreshToken,
   revokeRefreshToken,

@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. RBAC 初始化与幂等同步。
- * 2. 负责建表、补列以及把内置角色/权限定义同步进数据库。
- * 3. 启动时执行一次，保证权限系统具备最小可运行结构。
- */
-
 const db = require('../db')
 const {
   permissionDefinitions,
@@ -24,10 +17,12 @@ const query = (sql, values = []) =>
     })
   })
 
+// 处理表格数据，把当前模块的关键逻辑集中在这里。
 const ensureTable = async (sql) => {
   await query(sql)
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const ensureColumn = async (tableName, columnName, columnSql) => {
   const rows = await query(
     `
@@ -45,6 +40,7 @@ const ensureColumn = async (tableName, columnName, columnSql) => {
   }
 }
 
+// 同步角色，避免本地状态和服务端结果出现偏差。
 const syncRoles = async () => {
   for (const role of roleDefinitions) {
     await query(
@@ -61,6 +57,7 @@ const syncRoles = async () => {
   }
 }
 
+// 同步权限，避免本地状态和服务端结果出现偏差。
 const syncPermissions = async () => {
   for (const permission of permissionDefinitions) {
     await query(
@@ -77,6 +74,7 @@ const syncPermissions = async () => {
   }
 }
 
+// 同步角色权限，避免本地状态和服务端结果出现偏差。
 const syncRolePermissions = async () => {
   const roleRows = await query('select id, code from sys_roles')
   const permissionRows = await query('select id, code from sys_permissions')
@@ -108,6 +106,7 @@ const syncRolePermissions = async () => {
   }
 }
 
+// 初始化当前模块，确保启动后具备完整运行条件。
 const bootstrapRbac = async () => {
   await ensureTable(`
     create table if not exists sys_roles (
@@ -178,6 +177,7 @@ const bootstrapRbac = async () => {
   await syncRolePermissions()
 }
 
+// 导出当前模块的公共能力，方便其他业务文件按需复用。
 module.exports = {
   bootstrapRbac,
 }

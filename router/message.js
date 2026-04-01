@@ -1,11 +1,5 @@
-/**
- * 模块说明：
- * 1. 消息模块路由声明。
- * 2. 负责挂载消息公告的发布、编辑、回收站和列表查询接口。
- * 3. 消息相关的业务细节全部下沉到 handler 文件。
- */
-
 const express = require('express')
+// 创建当前模块的路由实例，后续接口都会挂在这里。
 const router = express.Router()
 const messageHandler = require('../router_handle/message')
 const { requirePermission } = require('../middleware/access')
@@ -20,8 +14,11 @@ router.post(
   requirePermission('api.message.publish'),
   messageHandler.publishMessage
 )
+// 处理消息列表接口，请求进入后会继续交给业务处理层。
 router.post('/companyMessageList', messageHandler.companyMessageList)
+// 处理消息列表接口，请求进入后会继续交给业务处理层。
 router.post('/systemMessageList', messageHandler.systemMessageList)
+// 处理消息接口，请求进入后会继续交给业务处理层。
 router.post('/editMessage', requirePermission('api.message.edit'), messageHandler.editMessage)
 router.post(
   '/searchMessageBydepartment',
@@ -33,8 +30,11 @@ router.post(
   requirePermission('api.message.list.read'),
   messageHandler.searchMessageByLevel
 )
+// 处理消息接口，请求进入后会继续交给业务处理层。
 router.post('/getMessage', messageHandler.getMessage)
+// 处理当前接口请求，权限校验通过后继续交给业务处理层。
 router.post('/updateClick', messageHandler.updateClick)
+// 处理当前接口请求，权限校验通过后继续交给业务处理层。
 router.post('/firstDelete', requirePermission('api.message.delete'), messageHandler.firstDelete)
 router.post(
   '/recycleList',
@@ -51,6 +51,7 @@ router.post(
   requirePermission('api.message.recycle.read'),
   messageHandler.returnRecycleListData
 )
+// 处理当前接口请求，权限校验通过后继续交给业务处理层。
 router.post('/recover', requirePermission('api.message.recover'), messageHandler.recover)
 router.post(
   '/deleteMessage',
@@ -78,4 +79,5 @@ router.post(
   messageHandler.returnSystemListData
 )
 
+// 导出当前模块的路由实例，供应用入口统一挂载。
 module.exports = router

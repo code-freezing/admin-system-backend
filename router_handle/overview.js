@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. 系统概览业务处理层。
- * 2. 负责查询首页图表、统计数字和排行等聚合数据。
- * 3. 前端概览页的多个板块都直接依赖这里。
- */
-
 const db = require('../db/index')
 
 const query = (sql, values = []) =>
@@ -21,7 +14,10 @@ const query = (sql, values = []) =>
 
 const COMPANY_ROLE_ORDER = ['超级管理员', '产品管理员', '用户管理员', '消息管理员', '用户']
 const MESSAGE_LEVEL_ORDER = ['一般', '重要', '必要', '紧急']
+// 发送数据，把当前结果统一回传给调用方。
+const sendData = (res, payload) => res.send(payload)
 
+// 解析配置，把原始输入转成后续可直接使用的结构。
 const parseCategoryConfig = (value) => {
   if (!value) {
     return []
@@ -61,7 +57,7 @@ exports.getCategoryAndNumber = async (req, res) => {
       categoryRows.map((item) => [item.product_category, Number(item.total_price || 0)])
     )
 
-    res.send({
+    sendData(res, {
       category,
       price: category.map((item) => priceMap.get(item) || 0),
     })
@@ -70,6 +66,7 @@ exports.getCategoryAndNumber = async (req, res) => {
   }
 }
 
+// 获取当前结果，让后续逻辑统一使用这一份数据。
 exports.getAdminAndNumber = async (req, res) => {
   try {
     const rows = await query(
@@ -81,7 +78,7 @@ exports.getAdminAndNumber = async (req, res) => {
     )
 
     const countMap = new Map(rows.map((item) => [item.identity, Number(item.total || 0)]))
-    res.send({
+    sendData(res, {
       data: COMPANY_ROLE_ORDER.map((name) => ({
         name,
         value: countMap.get(name) || 0,
@@ -92,6 +89,7 @@ exports.getAdminAndNumber = async (req, res) => {
   }
 }
 
+// 获取当前结果，让后续逻辑统一使用这一份数据。
 exports.getLevelAndNumber = async (req, res) => {
   try {
     const rows = await query(
@@ -111,7 +109,7 @@ exports.getLevelAndNumber = async (req, res) => {
         .filter((level) => level && !MESSAGE_LEVEL_ORDER.includes(level)),
     ]
 
-    res.send({
+    sendData(res, {
       data: allLevels.map((name) => ({
         name,
         value: countMap.get(name) || 0,
@@ -152,7 +150,7 @@ exports.getDayAndNumber = async (req, res) => {
       return date.toISOString().slice(0, 10)
     })
 
-    res.send({
+    sendData(res, {
       week,
       number: week.map((day) => countMap.get(day) || 0),
     })

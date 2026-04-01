@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. RBAC 内置角色、权限点和菜单树定义。
- * 2. 这里是权限系统的“单一事实来源”，启动时会同步到数据库。
- * 3. 前后端共享的权限码约定都从这里派生。
- */
-
 const ROLE_CODES = {
   SUPER_ADMIN: 'super_admin',
   USER_ADMIN: 'user_admin',
@@ -257,6 +250,7 @@ const apiPermissions = [
   { code: 'api.log.operation.clear', name: '清空操作日志', type: 'api' },
 ]
 
+// 处理菜单，把当前模块的关键逻辑集中在这里。
 const collectLeafMenus = (nodes) => {
   return nodes.flatMap((node) => {
     if (Array.isArray(node.children) && node.children.length > 0) {
@@ -367,10 +361,12 @@ const identityRoleCodeMap = {
   用户: ROLE_CODES.EMPLOYEE,
 }
 
+// 获取角色编码，让后续逻辑统一使用这一份结果。
 const getRoleCodeByIdentity = (identity) => {
   return identityRoleCodeMap[identity] || ROLE_CODES.EMPLOYEE
 }
 
+// 导出当前模块的公共能力，方便其他业务文件按需复用。
 module.exports = {
   ROLE_CODES,
   roleDefinitions,

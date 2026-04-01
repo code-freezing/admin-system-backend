@@ -1,5 +1,5 @@
 const js = require('@eslint/js')
-const prettierPlugin = require('eslint-plugin-prettier')
+const eslintConfigPrettier = require('eslint-config-prettier')
 
 module.exports = [
   // 忽略第三方依赖和上传目录，避免无意义扫描。
@@ -25,14 +25,12 @@ module.exports = [
         process: 'readonly',
       },
     },
-    plugins: {
-      prettier: prettierPlugin,
-    },
     rules: {
-      // 仅把 Prettier 结果作为警告，避免阻断开发流程。
-      'prettier/prettier': 'warn',
       'no-unused-vars': 'off',
       'no-console': 'off',
     },
   },
+
+  // 关闭可能与 Prettier 冲突的格式化规则，让 Prettier 专注排版，ESLint 专注代码质量。
+  eslintConfigPrettier,
 ]

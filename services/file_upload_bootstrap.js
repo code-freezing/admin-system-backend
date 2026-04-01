@@ -1,10 +1,3 @@
-/**
- * 模块说明：
- * 1. 文件上传能力初始化。
- * 2. 负责建表、补列、迁移旧文件记录，并清理过期分片会话。
- * 3. 启动时执行一次，确保分片上传、秒传和断点续传具备最小可运行结构。
- */
-
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
@@ -30,10 +23,12 @@ const query = (sql, values = []) =>
     })
   })
 
+// 处理表格数据，把当前模块的关键逻辑集中在这里。
 const ensureTable = async (sql) => {
   await query(sql)
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const ensureColumn = async (tableName, columnName, columnSql) => {
   const rows = await query(
     `
@@ -51,12 +46,14 @@ const ensureColumn = async (tableName, columnName, columnSql) => {
   }
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const ensureDirectories = () => {
   fs.mkdirSync(UPLOAD_ROOT, { recursive: true })
   fs.mkdirSync(OBJECT_ROOT, { recursive: true })
   fs.mkdirSync(CHUNK_ROOT, { recursive: true })
 }
 
+// 解析路径，让后续分支基于统一结果继续执行。
 const resolveStoragePath = (record) => {
   if (record.storage_path) {
     return record.storage_path
@@ -83,6 +80,7 @@ const resolveStoragePath = (record) => {
   return null
 }
 
+// 处理路径，把当前模块的关键逻辑集中在这里。
 const toAbsolutePath = (relativePath) => {
   if (!relativePath) {
     return null
@@ -91,6 +89,7 @@ const toAbsolutePath = (relativePath) => {
   return path.join(PUBLIC_ROOT, relativePath.replace(/^\//, ''))
 }
 
+// 处理文件，把当前模块的关键逻辑集中在这里。
 const fileExists = async (targetPath) => {
   if (!targetPath) {
     return false
@@ -104,6 +103,7 @@ const fileExists = async (targetPath) => {
   }
 }
 
+// 处理文件，把当前模块的关键逻辑集中在这里。
 const hashFile = (targetPath) =>
   new Promise((resolve, reject) => {
     const hash = crypto.createHash('md5')
@@ -114,11 +114,13 @@ const hashFile = (targetPath) =>
     stream.on('end', () => resolve(hash.digest('hex')))
   })
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const toNumber = (value) => {
   const number = Number(value)
   return Number.isFinite(number) ? number : 0
 }
 
+// 构建文件，把零散输入整理成后续可消费的结果。
 const buildFileUrl = (storagePath) => {
   if (!storagePath) {
     return null
@@ -127,6 +129,7 @@ const buildFileUrl = (storagePath) => {
   return `http://127.0.0.1:3007${storagePath}`
 }
 
+// 处理文件，把当前模块的关键逻辑集中在这里。
 const ensureFileObject = async (payload) => {
   const rows = await query('select * from file_objects where content_hash = ? limit 1', [
     payload.contentHash,
@@ -180,6 +183,7 @@ const ensureFileObject = async (payload) => {
   return result.insertId
 }
 
+// 处理文件，把当前模块的关键逻辑集中在这里。
 const migrateLegacyFiles = async () => {
   const rows = await query('select * from files order by id asc')
 
@@ -244,6 +248,7 @@ const migrateLegacyFiles = async () => {
   }
 }
 
+// 同步当前状态，避免本地结果和实际数据出现偏差。
 const syncObjectRefCounts = async () => {
   await query('update file_objects set ref_count = 0')
   await query(
@@ -261,6 +266,7 @@ const syncObjectRefCounts = async () => {
   )
 }
 
+// 处理当前模块的核心逻辑，避免同类分支散落在多个位置。
 const cleanupExpiredSessions = async () => {
   const rows = await query(
     `
@@ -291,6 +297,7 @@ const cleanupExpiredSessions = async () => {
   )
 }
 
+// 初始化文件上传，让模块在启动时具备完整运行条件。
 const bootstrapFileUpload = async () => {
   ensureDirectories()
 
@@ -341,6 +348,7 @@ const bootstrapFileUpload = async () => {
   await cleanupExpiredSessions()
 }
 
+// 导出当前模块的公共能力，方便其他业务文件按需复用。
 module.exports = {
   CHUNK_ROOT,
   OBJECT_ROOT,

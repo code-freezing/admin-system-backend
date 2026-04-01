@@ -1,11 +1,13 @@
-/**
- * 模块说明：
- * 1. 登录日志业务处理层。
- * 2. 负责写入和查询登录日志，支持分页和条件搜索。
- * 3. 管理员通过它回溯账号登录历史。
- */
-
 const db = require('../db/index')
+const sendStatus = (res, status, message, extra = {}) => {
+  res.send({
+    status,
+    message,
+    ...extra,
+  })
+}
+// 统一发送错误结果，避免不同分支各自拼接响应结构。
+const sendRows = (res, rows) => res.send(rows)
 
 // 写入一条登录日志。
 exports.loginLog = (req, res) => {
@@ -14,9 +16,7 @@ exports.loginLog = (req, res) => {
   const sql = 'insert into login_log set ?'
   db.query(sql, { account, name, email, login_time: loginTime }, (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-    })
+    sendStatus(res, 0, '')
   })
 }
 
@@ -25,7 +25,7 @@ exports.loginLogList = (req, res) => {
   const sql = 'select * from login_log'
   db.query(sql, (err, result) => {
     if (err) return res.cc(err)
-    res.send(result)
+    sendRows(res, result)
   })
 }
 
@@ -34,7 +34,7 @@ exports.searchLoginLogList = (req, res) => {
   const sql = 'select * from login_log where account = ? ORDER BY login_time desc limit 10'
   db.query(sql, req.body.account, (err, result) => {
     if (err) return res.cc(err)
-    res.send(result)
+    sendRows(res, result)
   })
 }
 
@@ -52,10 +52,10 @@ exports.loginLogListLength = (req, res) => {
 // 分页获取登录日志，每页 10 条。
 exports.returnLoginListData = (req, res) => {
   const number = (req.body.pager - 1) * 10
-  const sql = `select * from login_log ORDER BY login_time limit 10 offset ${number} `
-  db.query(sql, (err, result) => {
+  const sql = 'select * from login_log order by login_time desc limit 10 offset ?'
+  db.query(sql, [number], (err, result) => {
     if (err) return res.cc(err)
-    res.send(result)
+    sendRows(res, result)
   })
 }
 
@@ -64,9 +64,6 @@ exports.clearLoginLogList = (req, res) => {
   const sql = 'truncate table login_log'
   db.query(sql, (err) => {
     if (err) return res.cc(err)
-    res.send({
-      status: 0,
-      message: '数据表清空成功',
-    })
+    sendStatus(res, 0, '数据表清空成功')
   })
 }
